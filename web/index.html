@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080810">
+<title>DMX Relay Node</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+
+:root {
+  --bg: #080810;
+  --surface: #0f0f1a;
+  --surface2: #14141f;
+  --border: rgba(255,255,255,0.07);
+  --border-hi: rgba(255,255,255,0.14);
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --subtle: #4a5568;
+  --accent: #00d4aa;
+  --accent-dim: #00b891;
+  --accent-rgb: 0,212,170;
+  --art: #38bdf8;
+  --art-rgb: 56,189,248;
+  --warn: #f0922b;
+  --warn-rgb: 240,146,43;
+  --ok: #4ade80;
+  --danger: #f87171;
+  --danger-rgb: 248,113,113;
+  --mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', ui-monospace, monospace;
+  --nav-h: 64px;
+  --tabbar-h: 0px;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--accent); }
+
+/* ─── NAV ─────────────────────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 0 40px; height: var(--nav-h);
+  background: rgba(8,8,16,0.85);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; text-decoration: none; color: var(--text); }
+.brand svg { flex-shrink: 0; }
+.brand-name { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; white-space: nowrap; }
+.brand-host { font-family: var(--mono); font-size: 12px; color: var(--subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+
+.tabs { display: flex; align-items: center; gap: 32px; list-style: none; }
+.tab {
+  background: none; border: 0; cursor: pointer;
+  font-size: 14px; color: var(--muted); padding: 6px 0; position: relative;
+  display: flex; align-items: center; gap: 8px; transition: color 0.2s;
+}
+.tab svg { display: none; }
+.tab:hover, .tab.active { color: var(--text); }
+.tab.active::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; border-radius: 2px;
+  background: var(--accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.6);
+}
+.conn { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.nav-right { display: flex; align-items: center; gap: 32px; }
+
+/* ─── LAYOUT ──────────────────────────────────────────────── */
+main { max-width: 1200px; margin: 0 auto; padding: calc(var(--nav-h) + 48px) 40px 96px; }
+.hero { position: relative; margin-bottom: 36px; }
+.hero::before {
+  content: ''; position: absolute; top: -80px; left: -120px; width: 700px; height: 360px; max-width: 100vw;
+  background: radial-gradient(ellipse at center, rgba(var(--accent-rgb), 0.07) 0%, transparent 70%);
+  pointer-events: none; z-index: -1;
+}
+.section-tag {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 12px;
+}
+h1 {
+  font-size: clamp(30px, 4vw, 48px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.08;
+  margin-bottom: 12px;
+}
+.gradient-text {
+  background: linear-gradient(135deg, #ffffff 30%, var(--accent) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero-sub { font-size: 17px; color: var(--muted); max-width: 740px; line-height: 1.65; }
+.hero-sub .mono { color: var(--text); }
+.mono { font-family: var(--mono); }
+
+.page { display: none; }
+.page.active { display: block; animation: fade 0.25s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.section-gap { margin-top: 40px; }
+.section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+.section-head h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.section-head p { font-size: 14px; color: var(--muted); }
+
+/* ─── BADGES ──────────────────────────────────────────────── */
+.badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 24px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 100px;
+  padding: 4px 12px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--muted); white-space: nowrap;
+}
+.badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--subtle); }
+.badge.live { background: rgba(var(--accent-rgb),0.1); border-color: rgba(var(--accent-rgb),0.25); color: var(--accent); }
+.badge.live .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 1.6s infinite; }
+.badge.art.live { background: rgba(var(--art-rgb),0.08); border-color: rgba(var(--art-rgb),0.25); color: var(--art); }
+.badge.art.live .dot { background: var(--art); box-shadow: 0 0 8px var(--art); }
+.badge.warn { background: rgba(var(--warn-rgb),0.1); border-color: rgba(var(--warn-rgb),0.25); color: var(--warn); }
+.badge.warn .dot { background: var(--warn); }
+.badge.bad { background: rgba(var(--danger-rgb),0.1); border-color: rgba(var(--danger-rgb),0.25); color: var(--danger); }
+.badge.bad .dot { background: var(--danger); }
+.badge .val { font-family: var(--mono); letter-spacing: 0; text-transform: none; font-weight: 500; opacity: 0.85; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+/* ─── CARDS ───────────────────────────────────────────────── */
+.card {
+  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.035) 0%, var(--surface) 55%);
+  border: 1px solid var(--border);
+  border-top: 2px solid rgba(var(--accent-rgb),0.45);
+  border-radius: 16px; padding: 24px; position: relative; overflow: hidden; min-width: 0;
+}
+.card::before {
+  content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px;
+  background: radial-gradient(ellipse, rgba(var(--accent-rgb),0.07) 0%, transparent 70%); pointer-events: none;
+}
+.card.art { border-top-color: rgba(var(--art-rgb),0.5); background: linear-gradient(160deg, rgba(var(--art-rgb),0.035) 0%, var(--surface) 55%); }
+.card.art::before { background: radial-gradient(ellipse, rgba(var(--art-rgb),0.07) 0%, transparent 70%); }
+.card.danger { border-top-color: rgba(var(--danger-rgb),0.45); background: var(--surface); }
+.card.danger::before { display: none; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; position: relative; }
+.card-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.card.art .card-title { color: var(--art); }
+.card.danger .card-title { color: var(--danger); }
+.card-desc { font-size: 13.5px; color: var(--muted); line-height: 1.55; margin-bottom: 18px; position: relative; }
+
+/* ─── RELAY TILES ─────────────────────────────────────────── */
+.relays { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.relay {
+  display: flex; flex-direction: column; gap: 14px; text-align: left;
+  background: var(--surface); border: 1px solid var(--border);
+  border-top: 2px solid rgba(255,255,255,0.08);
+  border-radius: 16px; padding: 18px; position: relative; overflow: hidden; min-width: 0;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.25s;
+}
+.relay::before {
+  content: ''; position: absolute; top: -70px; right: -70px; width: 200px; height: 200px;
+  background: radial-gradient(ellipse, rgba(var(--accent-rgb),0.16) 0%, transparent 70%);
+  opacity: 0; transition: opacity 0.25s; pointer-events: none;
+}
+.relay.on { border-top-color: var(--accent); box-shadow: 0 0 40px rgba(var(--accent-rgb),0.08); }
+.relay.on::before { opacity: 1; }
+.relay.on.src-artnet { border-top-color: var(--art); box-shadow: 0 0 40px rgba(var(--art-rgb),0.08); }
+.relay.on.src-artnet::before { background: radial-gradient(ellipse, rgba(var(--art-rgb),0.16) 0%, transparent 70%); }
+.relay.on.src-manual { border-top-color: var(--warn); box-shadow: 0 0 40px rgba(var(--warn-rgb),0.08); }
+.relay.on.src-manual::before { background: radial-gradient(ellipse, rgba(var(--warn-rgb),0.16) 0%, transparent 70%); }
+.manual-mode .relay { cursor: pointer; }
+.manual-mode .relay:hover { transform: translateY(-2px); border-color: var(--border-hi); }
+.manual-mode .relay:active { transform: translateY(0); }
+.relay-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.relay-num {
+  font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--muted);
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 1px 7px;
+}
+.relay-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+.relay-state { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; color: var(--subtle); }
+.relay.on .relay-state { background: linear-gradient(135deg, #fff 20%, var(--accent) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.relay.on.src-artnet .relay-state { background-image: linear-gradient(135deg, #fff 20%, var(--art) 100%); }
+.relay.on.src-manual .relay-state { background-image: linear-gradient(135deg, #fff 20%, var(--warn) 100%); }
+.relay-src { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); }
+.levels { display: flex; flex-direction: column; gap: 7px; }
+.level { display: grid; grid-template-columns: 30px 1fr 30px; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--subtle); }
+.level b { font-weight: 500; text-align: right; color: var(--muted); }
+.bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,0.06); position: relative; overflow: visible; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--accent); width: 0; transition: width 0.15s; }
+.level.art .bar i { background: var(--art); }
+.bar .thr { position: absolute; top: -3px; bottom: -3px; width: 1px; background: rgba(255,255,255,0.35); }
+.level.none { opacity: 0.45; }
+
+/* ─── PARAM TABLE ─────────────────────────────────────────── */
+.params { display: flex; flex-direction: column; position: relative; }
+.param { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.param:last-child { border-bottom: 0; padding-bottom: 0; }
+.param:first-child { padding-top: 0; }
+.param span:first-child { color: var(--muted); flex-shrink: 0; }
+.param span:last-child { font-family: var(--mono); font-size: 13px; text-align: right; overflow-wrap: anywhere; }
+
+/* ─── FORMS ───────────────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 7px; min-width: 0; position: relative; }
+.field label, .label { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; }
+.field .hint { font-size: 12px; color: var(--subtle); }
+.input, select.input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); font-size: 15px; padding: 11px 14px; outline: none; min-height: 44px;
+  transition: border-color 0.15s, box-shadow 0.15s; -webkit-appearance: none; appearance: none;
+}
+.input::placeholder { color: var(--subtle); }
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.12); }
+.input.mono { font-family: var(--mono); font-size: 14px; }
+.input:disabled { opacity: 0.5; }
+select.input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%2394a3b8' stroke-width='1.6'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; cursor: pointer;
+}
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; position: relative; }
+.fields .full { grid-column: 1 / -1; }
+.row { display: flex; gap: 8px; align-items: stretch; }
+.row .input { flex: 1; min-width: 0; }
+
+.seg { display: inline-flex; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; }
+.seg button {
+  background: none; border: 0; border-radius: 7px; padding: 7px 14px; font-size: 13px; font-weight: 600;
+  color: var(--muted); cursor: pointer; transition: all 0.15s; min-height: 34px;
+}
+.seg button.active { background: var(--accent); color: #000; box-shadow: 0 0 20px rgba(var(--accent-rgb),0.25); }
+
+.switch { position: relative; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); user-select: none; }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch .track { width: 42px; height: 24px; border-radius: 24px; background: var(--surface2); border: 1px solid var(--border-hi); position: relative; transition: all 0.2s; flex-shrink: 0; }
+.switch .track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--muted); transition: all 0.2s; }
+.switch input:checked + .track { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 18px rgba(var(--accent-rgb),0.3); }
+.switch input:checked + .track::after { left: 20px; background: #000; }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card.art .switch input:checked + .track { background: var(--art); border-color: var(--art); box-shadow: 0 0 18px rgba(var(--art-rgb),0.3); }
+.warn-switch input:checked + .track { background: var(--warn); border-color: var(--warn); box-shadow: 0 0 18px rgba(var(--warn-rgb),0.3); }
+
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 44px; background: transparent; cursor: pointer; }
+input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--accent) var(--p, 50%), rgba(255,255,255,0.08) var(--p, 50%)); }
+input[type=range]::-moz-range-track { height: 4px; border-radius: 4px; background: rgba(255,255,255,0.08); }
+input[type=range]::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--accent); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; margin-top: -8px; box-shadow: 0 0 0 4px rgba(var(--accent-rgb),0.25); }
+input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(var(--accent-rgb),0.25); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 14px; font-family: var(--mono); font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.card.art .chip .dot { background: var(--art); }
+.chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; position: relative; }
+
+/* ─── BUTTONS ─────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-weight: 700; font-size: 15px; padding: 12px 24px; border-radius: 10px; min-height: 44px;
+  border: 1px solid transparent; cursor: pointer; text-decoration: none; transition: all 0.2s; white-space: nowrap;
+}
+.btn:disabled { opacity: 0.5; cursor: default; transform: none !important; }
+.btn-primary { background: var(--accent); color: #000; box-shadow: 0 0 40px rgba(var(--accent-rgb),0.2); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-dim); transform: translateY(-1px); box-shadow: 0 4px 48px rgba(var(--accent-rgb),0.3); }
+.btn-secondary { background: var(--surface2); color: var(--text); border-color: var(--border); font-weight: 600; }
+.btn-secondary:hover:not(:disabled) { background: var(--surface); border-color: var(--border-hi); transform: translateY(-1px); }
+.btn-danger { background: rgba(var(--danger-rgb),0.08); color: var(--danger); border-color: rgba(var(--danger-rgb),0.3); font-weight: 600; }
+.btn-danger:hover:not(:disabled) { background: rgba(var(--danger-rgb),0.15); }
+.btn-sm { font-size: 13px; padding: 8px 14px; min-height: 36px; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; position: relative; }
+
+/* ─── RELAY MAP TABLE ─────────────────────────────────────── */
+.map { display: flex; flex-direction: column; position: relative; }
+.map-row { display: grid; grid-template-columns: 44px 1fr 1.2fr; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.map-row:last-child { border-bottom: 0; }
+.map-row.head { padding-top: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); }
+
+/* ─── WIFI SCAN ───────────────────────────────────────────── */
+.scan { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; max-height: 260px; overflow-y: auto; }
+.scan button {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; cursor: pointer; min-height: 44px;
+}
+.scan button:hover { border-color: rgba(var(--accent-rgb),0.4); }
+.scan .ssid { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.signal { display: flex; align-items: flex-end; gap: 2px; height: 14px; flex-shrink: 0; }
+.signal i { width: 3px; border-radius: 1px; background: rgba(255,255,255,0.12); }
+.signal i.on { background: var(--accent); }
+.signal i:nth-child(1) { height: 25%; } .signal i:nth-child(2) { height: 50%; } .signal i:nth-child(3) { height: 75%; } .signal i:nth-child(4) { height: 100%; }
+
+/* ─── MISC ────────────────────────────────────────────────── */
+.note {
+  display: flex; gap: 12px; align-items: flex-start; font-size: 13.5px; color: var(--muted); line-height: 1.55;
+  background: rgba(var(--accent-rgb),0.05); border: 1px solid rgba(var(--accent-rgb),0.18); border-radius: 12px; padding: 14px 16px;
+}
+.note.warn { background: rgba(var(--warn-rgb),0.06); border-color: rgba(var(--warn-rgb),0.22); }
+.note b { color: var(--text); }
+.progress { height: 6px; border-radius: 6px; background: rgba(255,255,255,0.06); overflow: hidden; margin-top: 14px; }
+.progress i { display: block; height: 100%; width: 0; background: var(--accent); box-shadow: 0 0 12px var(--accent); transition: width 0.2s; }
+.file {
+  display: flex; align-items: center; gap: 12px; background: var(--surface2); border: 1px dashed var(--border-hi);
+  border-radius: 12px; padding: 14px 16px; cursor: pointer; font-size: 14px; color: var(--muted); min-height: 56px; position: relative;
+}
+.file:hover { border-color: var(--accent); color: var(--text); }
+.file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+.savebar {
+  position: fixed; left: 50%; transform: translate(-50%, 140%); bottom: calc(20px + var(--tabbar-h) + env(safe-area-inset-bottom));
+  z-index: 90; display: flex; align-items: center; gap: 16px; padding: 10px 10px 10px 20px; border-radius: 14px;
+  background: rgba(20,20,31,0.92); border: 1px solid var(--border-hi); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5); white-space: nowrap; max-width: calc(100vw - 32px);
+  opacity: 0; visibility: hidden; transition: transform 0.3s cubic-bezier(.2,.9,.3,1.2), opacity 0.2s, visibility 0.3s;
+}
+.savebar.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
+.savebar span { font-size: 14px; color: var(--muted); }
+
+.toast {
+  position: fixed; right: 24px; bottom: calc(24px + var(--tabbar-h) + env(safe-area-inset-bottom)); z-index: 200;
+  max-width: min(380px, calc(100vw - 32px)); padding: 12px 16px; border-radius: 12px; font-size: 14px;
+  background: var(--surface2); border: 1px solid var(--border-hi); box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  border-left: 3px solid var(--accent); opacity: 0; transform: translateY(10px); transition: all 0.25s; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: none; }
+.toast.err { border-left-color: var(--danger); }
+
+.overlay {
+  position: fixed; inset: 0; z-index: 300; background: rgba(8,8,16,0.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center;
+}
+.overlay .card { max-width: 460px; width: 100%; }
+.overlay h2 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 10px; }
+.overlay p { color: var(--muted); font-size: 14.5px; margin-bottom: 8px; position: relative; }
+.spinner { width: 36px; height: 36px; margin: 4px auto 18px; border-radius: 50%; border: 3px solid rgba(var(--accent-rgb),0.15); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: center; font-size: 13px; color: var(--subtle); }
+
+/* ─── RESPONSIVE ──────────────────────────────────────────── */
+@media (max-width: 960px) {
+  .relays { grid-template-columns: repeat(2, 1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  :root { --nav-h: 56px; --tabbar-h: 64px; }
+  /* backdrop-filter would make nav the containing block for the fixed tab bar inside it */
+  nav { padding: 0 16px; backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(8,8,16,0.96); }
+  .nav-right { gap: 0; }
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; gap: 0;
+    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+    background: rgba(8,8,16,0.9); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border);
+  }
+  .tabs li { flex: 1; height: 100%; }
+  .tab { flex-direction: column; gap: 3px; font-size: 11px; font-weight: 600; width: 100%; height: 100%; justify-content: center; padding: 0; }
+  .tab svg { display: block; }
+  .tab.active { color: var(--accent); }
+  .tab.active::after { top: -1px; bottom: auto; left: 30%; right: 30%; }
+  main { padding: calc(var(--nav-h) + 28px) 16px 48px; }
+  .hero { margin-bottom: 24px; }
+  .hero-sub { font-size: 15px; }
+  .card { padding: 18px; }
+  .relays { gap: 10px; }
+  .relay { padding: 14px; gap: 12px; }
+  .relay-state { font-size: 24px; }
+  .fields { grid-template-columns: 1fr; }
+  .map-row { grid-template-columns: 36px 1fr; }
+  .map-row .input { grid-column: 2; }
+  .map-row.head { display: none; }
+  .map-row select.input { margin-top: -4px; }
+  .toast { left: 16px; right: 16px; max-width: none; }
+  footer { padding: 24px 16px; }
+}
+@media (max-width: 380px) {
+  .brand-host { display: none; }
+  .relay-name { font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="brand" href="#status">
+    <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00d4aa"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+      <rect x="0.5" y="0.5" width="33" height="33" rx="9" fill="#0f0f1a" stroke="url(#g)" stroke-opacity="0.6"/>
+      <g stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"><path d="M10 9v16M17 9v16M24 9v16"/></g>
+      <g fill="#fff"><rect x="7" y="18" width="6" height="3.4" rx="1.2"/><rect x="14" y="11" width="6" height="3.4" rx="1.2"/><rect x="21" y="21" width="6" height="3.4" rx="1.2"/></g>
+    </svg>
+    <span class="brand-text"><span class="brand-name">DMX Relay</span><span class="brand-host" id="navHost">—</span></span>
+  </a>
+  <div class="nav-right">
+    <ul class="tabs" role="tablist">
+      <li><button class="tab" data-tab="status"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Status</button></li>
+      <li><button class="tab" data-tab="mapping"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3v18M12 3v18M18 3v18"/><rect x="3.5" y="13" width="5" height="3" rx="1" fill="currentColor"/><rect x="9.5" y="6" width="5" height="3" rx="1" fill="currentColor"/><rect x="15.5" y="15" width="5" height="3" rx="1" fill="currentColor"/></svg>Mapping</button></li>
+      <li><button class="tab" data-tab="network"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M12 8v4M5 16v-4h14v4"/></svg>Network</button></li>
+      <li><button class="tab" data-tab="system"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>System</button></li>
+    </ul>
+    <span class="conn"><span class="badge" id="connBadge"><span class="dot"></span><span id="connText">Connecting</span></span></span>
+  </div>
+</nav>
+
+<main>
+
+<!-- ═══ STATUS ═══════════════════════════════════════════════ -->
+<section class="page" id="page-status">
+  <div class="hero">
+    <div class="section-tag">Live output</div>
+    <h1><span class="gradient-text">Relay status</span></h1>
+    <p class="hero-sub" id="statusSub">Loading…</p>
+    <div class="badges">
+      <span class="badge" id="bEth"><span class="dot"></span>Ethernet <span class="val"></span></span>
+      <span class="badge" id="bWifi"><span class="dot"></span>Wi-Fi <span class="val"></span></span>
+      <span class="badge" id="bDmx"><span class="dot"></span>DMX <span class="val"></span></span>
+      <span class="badge art" id="bArt"><span class="dot"></span>Art-Net <span class="val"></span></span>
+      <span class="badge warn" id="bManual" hidden><span class="dot"></span>Manual override</span>
+      <span class="badge bad" id="bExp" hidden><span class="dot"></span>Relay driver fault</span>
+    </div>
+  </div>
+
+  <div class="relays" id="relays"></div>
+
+  <div class="section-gap grid-2">
+    <div class="card" style="--accent-rgb: var(--warn-rgb)">
+      <div class="card-head">
+        <span class="card-title" style="color: var(--warn)">Manual override</span>
+        <label class="switch warn-switch"><input type="checkbox" id="manualToggle"><span class="track"></span></label>
+      </div>
+      <p class="card-desc">Take the relays off DMX and Art-Net to test wiring. While on, tap a relay above to switch it. Turns off again when the device restarts.</p>
+      <div class="btn-row" id="manualBtns" hidden>
+        <button class="btn btn-secondary btn-sm" data-all="1">All on</button>
+        <button class="btn btn-secondary btn-sm" data-all="0">All off</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Inputs</span></div>
+      <div class="params" id="inputParams"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ MAPPING ══════════════════════════════════════════════ -->
+<section class="page" id="page-mapping">
+  <div class="hero">
+    <div class="section-tag">Patch</div>
+    <h1><span class="gradient-text">Inputs &amp; mapping</span></h1>
+    <p class="hero-sub">Each input listens to an 8-channel range. A relay closes when its channel is at or above the threshold. Changes apply immediately when saved.</p>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">DMX input · RS485</span>
+        <label class="switch"><input type="checkbox" id="dmxEnabled" data-dirty><span class="track"></span></label>
+      </div>
+      <div class="fields">
+        <div class="field full">
+          <label for="dmxStart">Start address</label>
+          <input class="input mono" id="dmxStart" type="number" inputmode="numeric" min="1" max="505" data-dirty>
+          <span class="hint">1–505</span>
+        </div>
+      </div>
+      <div class="chip-row"><span class="chip"><span class="dot"></span><span id="dmxRange">—</span></span></div>
+    </div>
+
+    <div class="card art">
+      <div class="card-head">
+        <span class="card-title">Art-Net input · UDP 6454</span>
+        <label class="switch"><input type="checkbox" id="artEnabled" data-dirty><span class="track"></span></label>
+      </div>
+      <div class="fields">
+        <div class="field">
+          <label for="artUniverse">Universe</label>
+          <input class="input mono" id="artUniverse" type="number" inputmode="numeric" min="0" max="32767" data-dirty>
+          <span class="hint" id="artNsu">Net 0 · Sub-Net 0 · Universe 0</span>
+        </div>
+        <div class="field">
+          <label for="artStart">Start channel</label>
+          <input class="input mono" id="artStart" type="number" inputmode="numeric" min="1" max="505" data-dirty>
+          <span class="hint">1–505</span>
+        </div>
+      </div>
+      <div class="chip-row"><span class="chip"><span class="dot"></span><span id="artRange">—</span></span></div>
+    </div>
+  </div>
+
+  <div class="card section-gap">
+    <div class="card-head"><span class="card-title">Relay assignment</span></div>
+    <p class="card-desc">Choose which channel of the range drives each relay. DMX and Art-Net use the same assignment.</p>
+    <div class="map" id="map">
+      <div class="map-row head"><span>#</span><span>Name</span><span>Channel</span></div>
+    </div>
+  </div>
+
+  <div class="card section-gap">
+    <div class="card-head"><span class="card-title">Behaviour</span></div>
+    <div class="fields">
+      <div class="field">
+        <label for="threshold">Switch-on threshold</label>
+        <div class="row" style="align-items:center; gap:14px">
+          <input id="threshold" type="range" min="1" max="255" data-dirty>
+          <input class="input mono" id="thresholdNum" type="number" inputmode="numeric" min="1" max="255" style="max-width:90px; flex:none" data-dirty>
+        </div>
+        <span class="hint" id="thresholdHint"></span>
+      </div>
+      <div class="field">
+        <label for="merge">When DMX and Art-Net are both live</label>
+        <select class="input" id="merge" data-dirty>
+          <option value="htp">Highest value wins (HTP)</option>
+          <option value="ltp">Most recent input wins (LTP)</option>
+          <option value="dmx">Prefer DMX</option>
+          <option value="artnet">Prefer Art-Net</option>
+        </select>
+      </div>
+      <div class="field">
+        <span class="label">On signal loss</span>
+        <div class="seg" id="loss">
+          <button type="button" data-v="hold">Hold last state</button>
+          <button type="button" data-v="off">All relays off</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="lossTimeout">Signal-loss timeout (seconds)</label>
+        <input class="input mono" id="lossTimeout" type="number" inputmode="decimal" min="1" max="60" step="0.5" data-dirty>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ NETWORK ══════════════════════════════════════════════ -->
+<section class="page" id="page-network">
+  <div class="hero">
+    <div class="section-tag">Connectivity</div>
+    <h1><span class="gradient-text">Network</span></h1>
+    <p class="hero-sub">Ethernet (PoE) is always on. Wi-Fi can run alongside it. Art-Net and this page are reachable on both. Saving network settings restarts the device.</p>
+  </div>
+
+  <div class="note warn" id="apNote" hidden style="margin-bottom:16px">
+    <span>⚠</span><span>The setup hotspot <b class="mono" id="apSsid"></b> is on because no network was available. It closes 2 minutes after Ethernet or Wi-Fi connects.</span>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head"><span class="card-title">Ethernet · PoE</span><span class="badge" id="ethBadge"><span class="dot"></span><span></span></span></div>
+      <div class="params" id="ethParams"></div>
+      <div class="section-gap" style="margin-top:24px">
+        <div class="seg" id="ethMode"><button type="button" data-v="dhcp">DHCP</button><button type="button" data-v="static">Static IP</button></div>
+      </div>
+      <div class="fields" id="ethStatic" style="margin-top:16px">
+        <div class="field"><label>IP address</label><input class="input mono" data-ip="ip" placeholder="192.168.1.50" inputmode="decimal"></div>
+        <div class="field"><label>Subnet mask</label><input class="input mono" data-ip="mask" placeholder="255.255.255.0" inputmode="decimal"></div>
+        <div class="field"><label>Gateway</label><input class="input mono" data-ip="gw" placeholder="192.168.1.1" inputmode="decimal"></div>
+        <div class="field"><label>DNS</label><input class="input mono" data-ip="dns" placeholder="optional" inputmode="decimal"></div>
+      </div>
+    </div>
+
+    <div class="card art">
+      <div class="card-head">
+        <span class="card-title">Wi-Fi</span>
+        <label class="switch"><input type="checkbox" id="wifiEnabled"><span class="track"></span></label>
+      </div>
+      <div class="params" id="wifiParams"></div>
+      <div id="wifiForm">
+        <div class="fields" style="margin-top:20px">
+          <div class="field full">
+            <label for="ssid">Network name</label>
+            <div class="row">
+              <input class="input" id="ssid" autocomplete="off" autocapitalize="off" spellcheck="false">
+              <button class="btn btn-secondary btn-sm" id="scanBtn" type="button">Scan</button>
+            </div>
+            <div class="scan" id="scanList"></div>
+          </div>
+          <div class="field full">
+            <label for="pass">Password</label>
+            <div class="row">
+              <input class="input" id="pass" type="password" autocomplete="new-password">
+              <button class="btn btn-secondary btn-sm" id="passShow" type="button">Show</button>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:20px">
+          <div class="seg" id="wifiMode"><button type="button" data-v="dhcp">DHCP</button><button type="button" data-v="static">Static IP</button></div>
+        </div>
+        <div class="fields" id="wifiStatic" style="margin-top:16px">
+          <div class="field"><label>IP address</label><input class="input mono" data-ip="ip" placeholder="192.168.1.51" inputmode="decimal"></div>
+          <div class="field"><label>Subnet mask</label><input class="input mono" data-ip="mask" placeholder="255.255.255.0" inputmode="decimal"></div>
+          <div class="field"><label>Gateway</label><input class="input mono" data-ip="gw" placeholder="192.168.1.1" inputmode="decimal"></div>
+          <div class="field"><label>DNS</label><input class="input mono" data-ip="dns" placeholder="optional" inputmode="decimal"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card section-gap">
+    <div class="card-head"><span class="card-title">Device name</span></div>
+    <div class="fields">
+      <div class="field">
+        <label for="hostname">Hostname</label>
+        <input class="input mono" id="hostname" autocapitalize="off" spellcheck="false" maxlength="31">
+        <span class="hint">Also reachable at <span class="mono" id="mdnsName"></span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-row section-gap" style="margin-top:24px">
+    <button class="btn btn-primary" id="netSave">Save &amp; restart</button>
+  </div>
+</section>
+
+<!-- ═══ SYSTEM ═══════════════════════════════════════════════ -->
+<section class="page" id="page-system">
+  <div class="hero">
+    <div class="section-tag">Device</div>
+    <h1><span class="gradient-text">System</span></h1>
+    <p class="hero-sub">Waveshare ESP32-S3-POE-ETH-8DI-8RO running the DMX Relay Node firmware.</p>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head"><span class="card-title">About</span></div>
+      <div class="params" id="sysParams"></div>
+    </div>
+    <div class="stack">
+      <div class="card art">
+        <div class="card-head"><span class="card-title">Firmware update</span></div>
+        <p class="card-desc">Upload a <span class="mono">firmware.bin</span> built from this project. The device restarts when the upload finishes; settings are kept.</p>
+        <label class="file"><input type="file" id="fwFile" accept=".bin"><span>⬆</span><span id="fwName">Choose firmware.bin</span></label>
+        <div class="progress" id="fwProg" hidden><i></i></div>
+        <div class="btn-row" style="margin-top:16px"><button class="btn btn-primary" id="fwUpload" disabled>Upload &amp; install</button></div>
+      </div>
+      <div class="card danger">
+        <div class="card-head"><span class="card-title">Maintenance</span></div>
+        <p class="card-desc">Factory reset erases every setting, including Wi-Fi and static IPs. You can also hold the BOOT button for 5 seconds.</p>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="rebootBtn">Restart</button>
+          <button class="btn btn-danger" id="resetBtn">Factory reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>DMX Relay Node · <span class="mono" id="footFw"></span></footer>
+
+<div class="savebar" id="savebar"><span>Unsaved changes</span><button class="btn btn-secondary btn-sm" id="mapRevert">Discard</button><button class="btn btn-primary btn-sm" id="mapSave">Save</button></div>
+<div class="toast" id="toast"></div>
+<div class="overlay" id="overlay" hidden><div class="card"><div class="spinner"></div><h2 id="ovTitle">Restarting</h2><p id="ovText"></p><p id="ovLinks"></p></div></div>
+
+<script>
+'use strict';
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const pad3 = n => String(n).padStart(3, '0');
+let cfg = null, st = null, dirty = false, polling = null, offline = false;
+
+// ─── API ───────────────────────────────────────────────────
+async function api(path, body) {
+  const opts = body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+
+let toastTimer;
+function toast(msg, err) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('err', !!err);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+// ─── TABS ──────────────────────────────────────────────────
+function showTab(name) {
+  if (!$('#page-' + name)) name = 'status';
+  $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+  $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  $('#savebar').classList.toggle('show', dirty && name === 'mapping');
+  if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+  window.scrollTo(0, 0);
+}
+$$('.tab').forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
+window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
+
+// ─── HELPERS ───────────────────────────────────────────────
+function setBadge(el, cls, val) {
+  el.classList.remove('live', 'warn', 'bad');
+  if (cls) el.classList.add(cls);
+  const v = $('.val', el);
+  if (v) v.textContent = val || '';
+}
+function params(el, rows) {
+  el.replaceChildren(...rows.filter(Boolean).map(([k, v]) => {
+    const d = document.createElement('div');
+    d.className = 'param';
+    const a = document.createElement('span'); a.textContent = k;
+    const b = document.createElement('span'); b.textContent = v;
+    d.append(a, b);
+    return d;
+  }));
+}
+function segValue(el) { return $('button.active', el)?.dataset.v; }
+function setSeg(el, v) { $$('button', el).forEach(b => b.classList.toggle('active', b.dataset.v === v)); }
+$$('.seg').forEach(s => s.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  setSeg(s, b.dataset.v);
+  s.dispatchEvent(new Event('change', { bubbles: true }));
+}));
+function uptime(s) {
+  const d = Math.floor(s / 86400), h = Math.floor(s / 3600) % 24, m = Math.floor(s / 60) % 60;
+  return (d ? d + 'd ' : '') + (d || h ? h + 'h ' : '') + m + 'm ' + (s % 60) + 's';
+}
+function clampInt(v, lo, hi, def) { v = parseInt(v, 10); return isNaN(v) ? def : Math.min(hi, Math.max(lo, v)); }
+
+// ─── STATUS PAGE ───────────────────────────────────────────
+function buildRelays() {
+  const wrap = $('#relays');
+  wrap.replaceChildren();
+  for (let i = 0; i < 8; i++) {
+    const el = document.createElement('div');
+    el.className = 'relay';
+    el.dataset.i = i;
+    el.innerHTML = `<div class="relay-top"><span class="relay-num">${String(i + 1).padStart(2, '0')}</span><span class="relay-name"></span></div>
+      <div><div class="relay-state">OFF</div><div class="relay-src">&nbsp;</div></div>
+      <div class="levels"><div class="level dmx"><span>DMX</span><span class="bar"><i></i><span class="thr"></span></span><b>—</b></div>
+      <div class="level art"><span>ART</span><span class="bar"><i></i><span class="thr"></span></span><b>—</b></div></div>`;
+    el.addEventListener('click', () => {
+      if (!st || !st.manual) return;
+      const on = !st.relays[i].on;
+      st.relays[i].on = on;
+      renderStatus();
+      api('/api/relays', { index: i, on }).catch(e => toast(e.message, true));
+    });
+    wrap.append(el);
+  }
+}
+
+const SRC_LABEL = { dmx: 'via DMX', artnet: 'via Art-Net', manual: 'manual', hold: 'holding · no signal' };
+
+function renderStatus() {
+  if (!st) return;
+  const c = cfg;
+  $('#navHost').textContent = st.hostname + '.local';
+  $('#footFw').textContent = 'v' + st.fw;
+  document.title = st.hostname + ' · DMX Relay';
+
+  setBadge($('#bEth'), st.eth.connected ? 'live' : st.eth.link ? 'warn' : '', st.eth.connected ? st.eth.ip : st.eth.link ? 'no IP' : 'unplugged');
+  setBadge($('#bWifi'), st.wifi.connected ? 'live' : st.wifi.enabled ? 'warn' : '', st.wifi.connected ? st.wifi.ip : st.wifi.enabled ? 'connecting' : 'off');
+  setBadge($('#bDmx'), st.dmx.live ? 'live' : '', st.dmx.live ? st.dmx.fps + ' fps' : c && !c.dmx.enabled ? 'disabled' : 'no signal');
+  setBadge($('#bArt'), st.artnet.live ? 'live' : '', st.artnet.live ? st.artnet.fps + ' fps' : c && !c.artnet.enabled ? 'disabled' : 'no signal');
+  $('#bManual').hidden = !st.manual;
+  $('#bExp').hidden = st.expander;
+
+  if (c) {
+    const dr = `${pad3(c.dmx.start)}–${pad3(c.dmx.start + 7)}`, ar = `${pad3(c.artnet.start)}–${pad3(c.artnet.start + 7)}`;
+    const sub = $('#statusSub');
+    sub.replaceChildren();
+    const m = (t) => { const s = document.createElement('span'); s.className = 'mono'; s.textContent = t; return s; };
+    if (c.dmx.enabled) sub.append('DMX ', m(dr));
+    if (c.dmx.enabled && c.artnet.enabled) sub.append(' and ');
+    if (c.artnet.enabled) sub.append('Art-Net universe ', m(String(c.artnet.universe)), ' channels ', m(ar));
+    if (!c.dmx.enabled && !c.artnet.enabled) sub.append('Both inputs are disabled.');
+    else sub.append(' drive eight relays, on at ', m('≥ ' + c.relays.threshold), '.');
+  }
+
+  $('#relays').classList.toggle('manual-mode', st.manual);
+  $('#manualToggle').checked = st.manual;
+  $('#manualBtns').hidden = !st.manual;
+
+  const thr = c ? c.relays.threshold : 128;
+  $$('.relay').forEach((el, i) => {
+    const r = st.relays[i];
+    el.className = 'relay' + (r.on ? ' on' : '') + (r.src ? ' src-' + r.src : '');
+    $('.relay-name', el).textContent = c ? c.relays.names[i] : 'Relay ' + (i + 1);
+    $('.relay-state', el).textContent = r.on ? 'ON' : 'OFF';
+    const slot = c ? c.relays.map[i] : 0;
+    $('.relay-src', el).textContent = slot === 0 && !st.manual ? 'unassigned' : (SRC_LABEL[r.src] || ' ');
+    for (const [k, cls] of [['dmx', '.level.dmx'], ['art', '.level.art']]) {
+      const lv = $(cls, el), v = r[k];
+      lv.classList.toggle('none', v === undefined);
+      $('i', lv).style.width = (v === undefined ? 0 : v / 2.55) + '%';
+      $('.thr', lv).style.left = (thr / 2.55) + '%';
+      $('b', lv).textContent = v === undefined ? '—' : v;
+    }
+  });
+
+  params($('#inputParams'), [
+    ['DMX', st.dmx.live ? `${st.dmx.fps} fps · ${st.dmx.slots} slots` : (c && !c.dmx.enabled ? 'disabled' : 'no signal')],
+    ['DMX frames / errors', `${st.dmx.frames} / ${st.dmx.errors}`],
+    ['Art-Net', st.artnet.live ? `${st.artnet.fps} fps · ${st.artnet.slots} ch` : (c && !c.artnet.enabled ? 'disabled' : 'no signal')],
+    ['Art-Net packets', String(st.artnet.packets)],
+    st.artnet.from && ['Art-Net source', st.artnet.from],
+  ]);
+
+  renderNetStatus();
+  params($('#sysParams'), [
+    ['Firmware', 'v' + st.fw],
+    ['Uptime', uptime(st.uptime)],
+    ['Free memory', Math.round(st.heap / 1024) + ' KB'],
+    ['Relay driver', st.expander ? 'TCA9554 OK' : 'not responding'],
+    ['Ethernet MAC', st.eth.mac],
+    ['Wi-Fi MAC', st.wifi.mac],
+  ]);
+}
+
+$('#manualToggle').addEventListener('change', e => {
+  api('/api/relays', { manual: e.target.checked }).then(poll).catch(err => toast(err.message, true));
+});
+$$('#manualBtns [data-all]').forEach(b => b.addEventListener('click', () => {
+  api('/api/relays', { all: b.dataset.all === '1' }).then(poll).catch(err => toast(err.message, true));
+}));
+
+async function poll() {
+  try {
+    st = await api('/api/status');
+    if (offline) { offline = false; if (!cfg) loadConfig(); }
+    setBadge($('#connBadge'), 'live');
+    $('#connText').textContent = 'Online';
+    renderStatus();
+  } catch (e) {
+    offline = true;
+    setBadge($('#connBadge'), 'bad');
+    $('#connText').textContent = 'Offline';
+  }
+}
+function startPolling() {
+  clearInterval(polling);
+  polling = setInterval(() => { if (!document.hidden) poll(); }, 750);
+  poll();
+}
+
+// ─── MAPPING PAGE ──────────────────────────────────────────
+function buildMap() {
+  const wrap = $('#map');
+  for (let i = 0; i < 8; i++) {
+    const row = document.createElement('div');
+    row.className = 'map-row';
+    row.innerHTML = `<span class="relay-num" style="justify-self:start">${String(i + 1).padStart(2, '0')}</span>
+      <input class="input" data-name="${i}" maxlength="24" data-dirty aria-label="Relay ${i + 1} name">
+      <select class="input mono" data-map="${i}" data-dirty aria-label="Relay ${i + 1} channel"></select>`;
+    wrap.append(row);
+  }
+}
+
+function refreshRangeLabels() {
+  const ds = clampInt($('#dmxStart').value, 1, 505, 1), as = clampInt($('#artStart').value, 1, 505, 1);
+  const u = clampInt($('#artUniverse').value, 0, 32767, 0);
+  $('#dmxRange').textContent = `DMX ${pad3(ds)} – ${pad3(ds + 7)}`;
+  $('#artRange').textContent = `U${u} · ${pad3(as)} – ${pad3(as + 7)}`;
+  $('#artNsu').textContent = `Net ${u >> 8} · Sub-Net ${(u >> 4) & 15} · Universe ${u & 15}`;
+  $$('[data-map]').forEach(sel => {
+    const cur = sel.value;
+    sel.replaceChildren(new Option('Unassigned', '0'));
+    for (let s = 1; s <= 8; s++) sel.append(new Option(`Ch ${s}  ·  DMX ${pad3(ds + s - 1)}  ·  Art ${pad3(as + s - 1)}`, String(s)));
+    sel.value = cur || '0';
+  });
+  const t = clampInt($('#thresholdNum').value, 1, 255, 128);
+  $('#threshold').style.setProperty('--p', (t - 1) / 2.54 + '%');
+  $('#thresholdHint').textContent = `Relay closes at ${t}/255 (${Math.round(t / 2.55)}%)`;
+}
+
+function fillMapping() {
+  $('#dmxEnabled').checked = cfg.dmx.enabled;
+  $('#dmxStart').value = cfg.dmx.start;
+  $('#artEnabled').checked = cfg.artnet.enabled;
+  $('#artUniverse').value = cfg.artnet.universe;
+  $('#artStart').value = cfg.artnet.start;
+  $('#threshold').value = $('#thresholdNum').value = cfg.relays.threshold;
+  $('#merge').value = cfg.relays.merge;
+  setSeg($('#loss'), cfg.relays.loss);
+  $('#lossTimeout').value = cfg.relays.lossTimeout;
+  $$('[data-name]').forEach(el => el.value = cfg.relays.names[el.dataset.name]);
+  $$('[data-map]').forEach(el => el.value = '0');
+  refreshRangeLabels();
+  $$('[data-map]').forEach(el => el.value = String(cfg.relays.map[el.dataset.map]));
+  setDirty(false);
+}
+
+function setDirty(d) {
+  dirty = d;
+  $('#savebar').classList.toggle('show', d && $('#page-mapping').classList.contains('active'));
+}
+
+$('#page-mapping').addEventListener('input', e => {
+  if (e.target.id === 'threshold') $('#thresholdNum').value = e.target.value;
+  if (e.target.id === 'thresholdNum') $('#threshold').value = e.target.value;
+  refreshRangeLabels();
+  setDirty(true);
+});
+$('#page-mapping').addEventListener('change', () => setDirty(true));
+$('#mapRevert').addEventListener('click', fillMapping);
+
+$('#mapSave').addEventListener('click', async () => {
+  const body = {
+    dmx: { enabled: $('#dmxEnabled').checked, start: clampInt($('#dmxStart').value, 1, 505, 1) },
+    artnet: {
+      enabled: $('#artEnabled').checked,
+      universe: clampInt($('#artUniverse').value, 0, 32767, 0),
+      start: clampInt($('#artStart').value, 1, 505, 1),
+    },
+    relays: {
+      threshold: clampInt($('#thresholdNum').value, 1, 255, 128),
+      merge: $('#merge').value,
+      loss: segValue($('#loss')),
+      lossTimeout: Math.min(60, Math.max(1, parseFloat($('#lossTimeout').value) || 5)),
+      map: $$('[data-map]').map(el => parseInt(el.value, 10)),
+      names: $$('[data-name]').map((el, i) => el.value.trim() || `Relay ${i + 1}`),
+    },
+  };
+  const btn = $('#mapSave');
+  btn.disabled = true;
+  try {
+    const r = await api('/api/config', body);
+    cfg = r.config;
+    fillMapping();
+    renderStatus();
+    toast('Mapping saved and applied');
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ─── NETWORK PAGE ──────────────────────────────────────────
+let passTouched = false;
+
+function fillIp(prefix, s) {
+  setSeg($('#' + prefix + 'Mode'), s.dhcp ? 'dhcp' : 'static');
+  $$('[data-ip]', $('#' + prefix + 'Static')).forEach(el => el.value = s[el.dataset.ip] || '');
+  syncIpMode(prefix);
+}
+function readIp(prefix) {
+  const o = { dhcp: segValue($('#' + prefix + 'Mode')) === 'dhcp' };
+  $$('[data-ip]', $('#' + prefix + 'Static')).forEach(el => o[el.dataset.ip] = el.value.trim());
+  return o;
+}
+function syncIpMode(prefix) {
+  const isStatic = segValue($('#' + prefix + 'Mode')) === 'static';
+  $('#' + prefix + 'Static').hidden = !isStatic;
+}
+['eth', 'wifi'].forEach(p => $('#' + p + 'Mode').addEventListener('change', () => {
+  syncIpMode(p);
+  // Prefill static fields from the live DHCP lease so switching is one tap.
+  const live = st && st[p];
+  if (segValue($('#' + p + 'Mode')) === 'static' && live && live.ip) {
+    $$('[data-ip]', $('#' + p + 'Static')).forEach(el => { if (!el.value && live[el.dataset.ip]) el.value = live[el.dataset.ip]; });
+  }
+}));
+
+function syncWifi() { $('#wifiForm').hidden = !$('#wifiEnabled').checked; }
+$('#wifiEnabled').addEventListener('change', syncWifi);
+
+function fillNetwork() {
+  fillIp('eth', cfg.eth);
+  $('#wifiEnabled').checked = cfg.wifi.enabled;
+  $('#ssid').value = cfg.wifi.ssid;
+  $('#pass').value = '';
+  $('#pass').placeholder = cfg.wifi.hasPass ? '•••••••• saved — type to change' : 'Leave empty for an open network';
+  passTouched = false;
+  fillIp('wifi', cfg.wifi);
+  $('#hostname').value = cfg.hostname;
+  $('#mdnsName').textContent = cfg.hostname + '.local';
+  syncWifi();
+}
+$('#pass').addEventListener('input', () => passTouched = true);
+$('#passShow').addEventListener('click', () => {
+  const p = $('#pass'), show = p.type === 'password';
+  p.type = show ? 'text' : 'password';
+  $('#passShow').textContent = show ? 'Hide' : 'Show';
+});
+$('#hostname').addEventListener('input', e => $('#mdnsName').textContent = (e.target.value.trim().toLowerCase() || '…') + '.local');
+
+function renderNetStatus() {
+  if (!st) return;
+  const e = st.eth, w = st.wifi;
+  const eb = $('#ethBadge');
+  setBadge(eb, e.connected ? 'live' : e.link ? 'warn' : '');
+  $('span:last-child', eb).textContent = e.connected ? 'Connected' : e.link ? 'Link, no IP' : 'Unplugged';
+  params($('#ethParams'), [
+    ['Link', e.link ? `${e.speed} Mbps ${e.fullDuplex ? 'full' : 'half'} duplex` : 'down'],
+    e.ip && ['IP address', e.ip],
+    e.ip && ['Subnet mask', e.mask],
+    e.ip && ['Gateway', e.gw],
+    ['MAC', e.mac],
+  ]);
+  params($('#wifiParams'), w.enabled ? [
+    ['Status', w.connected ? `Connected to ${w.ssid}` : `Connecting to ${w.ssid}…`],
+    w.connected && ['Signal', `${w.rssi} dBm`],
+    w.ip && ['IP address', w.ip],
+  ] : [['Status', 'Off']]);
+  $('#apNote').hidden = !st.ap.active;
+  $('#apSsid').textContent = st.ap.ssid;
+}
+
+function bars(rssi) {
+  const n = rssi > -55 ? 4 : rssi > -65 ? 3 : rssi > -75 ? 2 : 1;
+  return `<span class="signal">${[1, 2, 3, 4].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</span>`;
+}
+
+$('#scanBtn').addEventListener('click', async () => {
+  const btn = $('#scanBtn'), list = $('#scanList');
+  btn.disabled = true;
+  btn.textContent = 'Scanning…';
+  try {
+    let r = await api('/api/scan?start=1');
+    for (let i = 0; r.running && i < 30; i++) {
+      await new Promise(res => setTimeout(res, 700));
+      r = await api('/api/scan');
+    }
+    list.replaceChildren();
+    (r.networks || []).forEach(n => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.innerHTML = `<span class="ssid"></span><span style="display:flex;gap:10px;align-items:center;color:var(--subtle);font-size:12px">${n.secure ? '🔒' : ''}${bars(n.rssi)}</span>`;
+      $('.ssid', b).textContent = n.ssid;
+      b.addEventListener('click', () => {
+        $('#ssid').value = n.ssid;
+        list.replaceChildren();
+        $('#pass').focus();
+      });
+      list.append(b);
+    });
+    if (!r.networks || !r.networks.length) toast('No networks found', true);
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Scan';
+  }
+});
+
+$('#netSave').addEventListener('click', async () => {
+  const wifi = { enabled: $('#wifiEnabled').checked, ssid: $('#ssid').value.trim(), ...readIp('wifi') };
+  if (passTouched || wifi.ssid !== cfg.wifi.ssid) wifi.pass = $('#pass').value;
+  const body = { hostname: $('#hostname').value.trim().toLowerCase(), eth: readIp('eth'), wifi };
+  if (!confirm('Save network settings and restart the device?')) return;
+  try {
+    const r = await api('/api/config', body);
+    cfg = r.config;
+    fillNetwork();
+    if (r.reboot) rebootOverlay('Applying network settings', candidates());
+    else toast('No network changes to apply');
+  } catch (e) {
+    toast(e.message, true);
+  }
+});
+
+// Where to look for the device after a restart.
+function candidates() {
+  const urls = [];
+  if (!cfg.eth.dhcp && cfg.eth.ip) urls.push(cfg.eth.ip);
+  if (cfg.wifi.enabled && !cfg.wifi.dhcp && cfg.wifi.ip) urls.push(cfg.wifi.ip);
+  urls.push(cfg.hostname + '.local');
+  if (st && st.eth.ip && cfg.eth.dhcp) urls.push(st.eth.ip);
+  return [...new Set(urls)];
+}
+
+// ─── SYSTEM PAGE ───────────────────────────────────────────
+function rebootOverlay(title, hosts) {
+  clearInterval(polling);
+  $('#ovTitle').textContent = title;
+  $('#ovText').textContent = 'The device is restarting. This page reconnects automatically.';
+  const links = $('#ovLinks');
+  links.replaceChildren();
+  if (hosts && hosts.length) {
+    links.append('If it doesn’t, try ');
+    hosts.forEach((h, i) => {
+      const a = document.createElement('a');
+      a.href = 'http://' + h + '/';
+      a.textContent = h;
+      a.className = 'mono';
+      links.append(i ? ', ' : '', a);
+    });
+  }
+  $('#overlay').hidden = false;
+  const started = Date.now();
+  const timer = setInterval(async () => {
+    if (Date.now() - started < 4000) return;
+    try {
+      await api('/api/status');
+      clearInterval(timer);
+      location.reload();
+    } catch (e) { /* still down */ }
+  }, 1500);
+}
+
+$('#rebootBtn').addEventListener('click', async () => {
+  if (!confirm('Restart the device now?')) return;
+  try { await api('/api/reboot', {}); rebootOverlay('Restarting'); } catch (e) { toast(e.message, true); }
+});
+$('#resetBtn').addEventListener('click', async () => {
+  if (!confirm('Erase all settings and restart? The device returns to DHCP on Ethernet with Wi-Fi off.')) return;
+  try { await api('/api/factory-reset', {}); rebootOverlay('Factory reset', ['dmx-relay.local']); } catch (e) { toast(e.message, true); }
+});
+
+$('#fwFile').addEventListener('change', e => {
+  const f = e.target.files[0];
+  $('#fwName').textContent = f ? `${f.name} · ${Math.round(f.size / 1024)} KB` : 'Choose firmware.bin';
+  $('#fwUpload').disabled = !f;
+});
+$('#fwUpload').addEventListener('click', () => {
+  const f = $('#fwFile').files[0];
+  if (!f || !confirm(`Install ${f.name}? The device restarts afterwards.`)) return;
+  const fd = new FormData();
+  fd.append('firmware', f, f.name);
+  const xhr = new XMLHttpRequest();
+  const prog = $('#fwProg');
+  prog.hidden = false;
+  $('#fwUpload').disabled = true;
+  xhr.upload.onprogress = e => { if (e.lengthComputable) $('i', prog).style.width = (e.loaded / e.total * 100) + '%'; };
+  xhr.onload = () => {
+    let j = {};
+    try { j = JSON.parse(xhr.responseText); } catch (e) { /* ignore */ }
+    if (xhr.status === 200 && j.ok) rebootOverlay('Installing update');
+    else { toast('Update failed: ' + (j.error || xhr.status), true); $('#fwUpload').disabled = false; }
+  };
+  xhr.onerror = () => { toast('Upload failed', true); $('#fwUpload').disabled = false; };
+  xhr.open('POST', '/api/update');
+  xhr.send(fd);
+});
+
+// ─── BOOT ──────────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    cfg = await api('/api/config');
+    fillMapping();
+    fillNetwork();
+    renderStatus();
+  } catch (e) {
+    toast('Could not load settings: ' + e.message, true);
+  }
+}
+
+buildRelays();
+buildMap();
+showTab(location.hash.slice(1) || 'status');
+loadConfig().then(startPolling);
+</script>
+</body>
+</html>
