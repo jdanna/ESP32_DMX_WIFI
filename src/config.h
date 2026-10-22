@@ -6,7 +6,7 @@
 #include <IPAddress.h>
 #include "board.h"
 
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.1.0"
 
 enum MergeMode : uint8_t { MERGE_HTP, MERGE_LTP, MERGE_DMX_FIRST, MERGE_ART_FIRST };
 enum LossAction : uint8_t { LOSS_HOLD, LOSS_OFF };
