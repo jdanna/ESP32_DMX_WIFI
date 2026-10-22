@@ -4,6 +4,8 @@
 #include <Update.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <errno.h>
+#include <lwip/sockets.h>
 #include "config.h"
 #include "engine.h"
 #include "net.h"
@@ -15,6 +17,24 @@ WebServer server(80);
 uint32_t rebootAt;
 
 const char *SOURCE_NAMES[] = {nullptr, "dmx", "artnet", "manual", "hold"};
+
+// Live updates are pushed as Server-Sent Events. The relay engine runs in a
+// higher-priority task and DMX in an ISR, so nothing here can delay them.
+constexpr int MAX_EVENT_CLIENTS = 4;
+constexpr uint32_t LIVE_INTERVAL_MS = 33;   // level/fps updates: at most ~30/s, only on change
+constexpr uint32_t FULL_INTERVAL_MS = 1000; // full status (network, counters)
+constexpr uint32_t STALL_DROP_MS = 5000;    // drop a client that can't take data this long
+
+struct EventClient {
+  NetworkClient client;
+  bool used;
+  uint32_t since, stalledSince;
+};
+EventClient eventClients[MAX_EVENT_CLIENTS];
+String lastLive;
+uint8_t lastMask;
+bool lastManual, forceEvents;
+uint32_t lastLiveMs, lastFullMs;
 
 void sendJson(int code, const JsonDocument &doc) {
   String body;
@@ -50,9 +70,7 @@ void handleIndex() {
   server.send_P(200, "text/html", (const char *)WEB_INDEX_GZ, WEB_INDEX_GZ_LEN);
 }
 
-void handleStatus() {
-  JsonDocument doc;
-  JsonObject root = doc.to<JsonObject>();
+void buildStatus(JsonObject root) {
   root["fw"] = FW_VERSION;
   root["hostname"] = g_cfg.hostname;
   root["uptime"] = millis() / 1000;
@@ -85,7 +103,118 @@ void handleStatus() {
     if (st.artValue[i] >= 0) r["art"] = st.artValue[i];
     if (SOURCE_NAMES[st.source[i]]) r["src"] = SOURCE_NAMES[st.source[i]];
   }
+}
+
+void handleStatus() {
+  JsonDocument doc;
+  buildStatus(doc.to<JsonObject>());
   sendJson(200, doc);
+}
+
+// Compact form of the fast-changing fields: relay mask, per-relay source and
+// input values (-1 = none), input liveness and rates.
+String liveJson(const EngineStatus &st) {
+  JsonDocument doc;
+  doc["m"] = st.relayMask;
+  doc["man"] = st.manual;
+  doc["dl"] = st.dmx.live;
+  doc["df"] = st.dmx.fps;
+  doc["al"] = st.art.live;
+  doc["af"] = st.art.fps;
+  JsonArray d = doc["d"].to<JsonArray>(), a = doc["a"].to<JsonArray>(), src = doc["s"].to<JsonArray>();
+  for (int i = 0; i < RELAY_COUNT; i++) {
+    d.add(st.dmxValue[i]);
+    a.add(st.artValue[i]);
+    src.add((int)st.source[i]);
+  }
+  String out;
+  serializeJson(doc, out);
+  return out;
+}
+
+// Never blocks: a browser that can't keep up skips updates rather than holding
+// up the loop. A partial write would corrupt the stream, so that client is dropped
+// and EventSource reconnects on its own.
+bool sendNonBlocking(EventClient &ec, const String &msg, uint32_t now) {
+  int fd = ec.client.fd();
+  if (fd < 0) return false;
+  ssize_t n = send(fd, msg.c_str(), msg.length(), MSG_DONTWAIT);
+  if (n == (ssize_t)msg.length()) {
+    ec.stalledSince = 0;
+    return true;
+  }
+  if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+    if (!ec.stalledSince) ec.stalledSince = now;
+    return now - ec.stalledSince < STALL_DROP_MS;
+  }
+  return false;
+}
+
+void broadcast(const char *event, const String &json) {
+  String msg = String("event: ") + event + "\ndata: " + json + "\n\n";
+  const uint32_t now = millis();
+  for (EventClient &ec : eventClients) {
+    if (!ec.used || sendNonBlocking(ec, msg, now)) continue;
+    ec.client.stop();
+    ec.client = NetworkClient();
+    ec.used = false;
+  }
+}
+
+void pushEvents() {
+  bool any = false;
+  for (const EventClient &ec : eventClients) any |= ec.used;
+  if (!any) return;
+
+  const uint32_t now = millis();
+  const bool force = forceEvents;
+  forceEvents = false;
+
+  if (force || now - lastFullMs >= FULL_INTERVAL_MS) {
+    JsonDocument doc;
+    buildStatus(doc.to<JsonObject>());
+    String json;
+    serializeJson(doc, json);
+    broadcast("status", json);
+    lastFullMs = now;
+  }
+
+  const EngineStatus st = engineStatus();
+  const bool relaysChanged = st.relayMask != lastMask || st.manual != lastManual;
+  if (!force && !relaysChanged && now - lastLiveMs < LIVE_INTERVAL_MS) return;
+  String live = liveJson(st);
+  if (!force && live == lastLive) return;
+  broadcast("live", live);
+  lastLive = live;
+  lastLiveMs = now;
+  lastMask = st.relayMask;
+  lastManual = st.manual;
+}
+
+void handleEvents() {
+  // Take a slot, evicting the oldest stream if all are in use (e.g. forgotten tabs).
+  int slot = 0;
+  for (int i = 0; i < MAX_EVENT_CLIENTS; i++) {
+    if (!eventClients[i].used) {
+      slot = i;
+      break;
+    }
+    if (eventClients[i].since < eventClients[slot].since) slot = i;
+  }
+  EventClient &ec = eventClients[slot];
+  if (ec.used) ec.client.stop();
+
+  // Keep our own handle on the socket; WebServer just drops its reference after
+  // this returns, so the connection stays open without tying up the server.
+  ec.client = server.client();
+  ec.client.setNoDelay(true);
+  ec.client.print(
+      "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-store\r\n"
+      "Connection: keep-alive\r\n\r\nretry: 1000\n\n");
+  ec.used = true;
+  ec.since = millis();
+  ec.stalledSince = 0;
+  forceEvents = true;
 }
 
 void handleGetConfig() {
@@ -211,6 +340,7 @@ void handleNotFound() {
 void webBegin() {
   server.on("/", HTTP_GET, handleIndex);
   server.on("/api/status", HTTP_GET, handleStatus);
+  server.on("/api/events", HTTP_GET, handleEvents);
   server.on("/api/config", HTTP_GET, handleGetConfig);
   server.on("/api/config", HTTP_POST, handlePostConfig);
   server.on("/api/relays", HTTP_POST, handleRelays);
@@ -224,6 +354,7 @@ void webBegin() {
 
 void webLoop() {
   server.handleClient();
+  pushEvents();
   if (rebootAt && (int32_t)(millis() - rebootAt) >= 0) {
     Serial.println("[sys] Rebooting");
     delay(100);

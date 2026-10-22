@@ -99,6 +99,7 @@ If red and green look swapped, change `LED_COLOR_ORDER_RGB` in `src/main.cpp`.
 | Method | Path | Body / result |
 |---|---|---|
 | GET | `/api/status` | Network, input and relay state |
+| GET | `/api/events` | Server-Sent Events: `live` (relay/level changes, up to ~30/s) and `status` (full status, 1/s) |
 | GET | `/api/config` | Current settings (the Wi-Fi password is never returned) |
 | POST | `/api/config` | Partial settings JSON (same shape as GET). Network changes reboot the device |
 | POST | `/api/relays` | `{"manual":true}`, `{"index":0,"on":true}`, `{"all":false}` |

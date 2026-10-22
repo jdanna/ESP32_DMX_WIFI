@@ -190,7 +190,7 @@ h1 {
 .level { display: grid; grid-template-columns: 30px 1fr 30px; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--subtle); }
 .level b { font-weight: 500; text-align: right; color: var(--muted); }
 .bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,0.06); position: relative; overflow: visible; }
-.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--accent); width: 0; transition: width 0.15s; }
+.bar i { position: absolute; inset: 0; border-radius: 4px; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 80ms linear; will-change: transform; }
 .level.art .bar i { background: var(--art); }
 .bar .thr { position: absolute; top: -3px; bottom: -3px; width: 1px; background: rgba(255,255,255,0.35); }
 .level.none { opacity: 0.45; }
@@ -747,18 +747,44 @@ function buildRelays() {
 
 const SRC_LABEL = { dmx: 'via DMX', artnet: 'via Art-Net', manual: 'manual', hold: 'holding · no signal' };
 
+function renderLive() {
+  if (!st) return;
+  const c = cfg;
+  setBadge($('#bDmx'), st.dmx.live ? 'live' : '', st.dmx.live ? st.dmx.fps + ' fps' : c && !c.dmx.enabled ? 'disabled' : 'no signal');
+  setBadge($('#bArt'), st.artnet.live ? 'live' : '', st.artnet.live ? st.artnet.fps + ' fps' : c && !c.artnet.enabled ? 'disabled' : 'no signal');
+  $('#bManual').hidden = !st.manual;
+  $('#relays').classList.toggle('manual-mode', st.manual);
+  $('#manualToggle').checked = st.manual;
+  $('#manualBtns').hidden = !st.manual;
+
+  const thr = c ? c.relays.threshold : 128;
+  $$('.relay').forEach((el, i) => {
+    const r = st.relays[i];
+    el.className = 'relay' + (r.on ? ' on' : '') + (r.src ? ' src-' + r.src : '');
+    $('.relay-name', el).textContent = c ? c.relays.names[i] : 'Relay ' + (i + 1);
+    $('.relay-state', el).textContent = r.on ? 'ON' : 'OFF';
+    const slot = c ? c.relays.map[i] : 0;
+    $('.relay-src', el).textContent = slot === 0 && !st.manual ? 'unassigned' : (SRC_LABEL[r.src] || '\u00a0');
+    for (const [k, cls] of [['dmx', '.level.dmx'], ['art', '.level.art']]) {
+      const lv = $(cls, el), v = r[k];
+      lv.classList.toggle('none', v === undefined);
+      $('i', lv).style.transform = `scaleX(${v === undefined ? 0 : v / 255})`;
+      $('.thr', lv).style.left = (thr / 2.55) + '%';
+      $('b', lv).textContent = v === undefined ? '—' : v;
+    }
+  });
+}
+
 function renderStatus() {
   if (!st) return;
   const c = cfg;
+  renderLive();
   $('#navHost').textContent = st.hostname + '.local';
   $('#footFw').textContent = 'v' + st.fw;
   document.title = st.hostname + ' · DMX Relay';
 
   setBadge($('#bEth'), st.eth.connected ? 'live' : st.eth.link ? 'warn' : '', st.eth.connected ? st.eth.ip : st.eth.link ? 'no IP' : 'unplugged');
   setBadge($('#bWifi'), st.wifi.connected ? 'live' : st.wifi.enabled ? 'warn' : '', st.wifi.connected ? st.wifi.ip : st.wifi.enabled ? 'connecting' : 'off');
-  setBadge($('#bDmx'), st.dmx.live ? 'live' : '', st.dmx.live ? st.dmx.fps + ' fps' : c && !c.dmx.enabled ? 'disabled' : 'no signal');
-  setBadge($('#bArt'), st.artnet.live ? 'live' : '', st.artnet.live ? st.artnet.fps + ' fps' : c && !c.artnet.enabled ? 'disabled' : 'no signal');
-  $('#bManual').hidden = !st.manual;
   $('#bExp').hidden = st.expander;
 
   if (c) {
@@ -772,27 +798,6 @@ function renderStatus() {
     if (!c.dmx.enabled && !c.artnet.enabled) sub.append('Both inputs are disabled.');
     else sub.append(' drive eight relays, on at ', m('≥ ' + c.relays.threshold), '.');
   }
-
-  $('#relays').classList.toggle('manual-mode', st.manual);
-  $('#manualToggle').checked = st.manual;
-  $('#manualBtns').hidden = !st.manual;
-
-  const thr = c ? c.relays.threshold : 128;
-  $$('.relay').forEach((el, i) => {
-    const r = st.relays[i];
-    el.className = 'relay' + (r.on ? ' on' : '') + (r.src ? ' src-' + r.src : '');
-    $('.relay-name', el).textContent = c ? c.relays.names[i] : 'Relay ' + (i + 1);
-    $('.relay-state', el).textContent = r.on ? 'ON' : 'OFF';
-    const slot = c ? c.relays.map[i] : 0;
-    $('.relay-src', el).textContent = slot === 0 && !st.manual ? 'unassigned' : (SRC_LABEL[r.src] || ' ');
-    for (const [k, cls] of [['dmx', '.level.dmx'], ['art', '.level.art']]) {
-      const lv = $(cls, el), v = r[k];
-      lv.classList.toggle('none', v === undefined);
-      $('i', lv).style.width = (v === undefined ? 0 : v / 2.55) + '%';
-      $('.thr', lv).style.left = (thr / 2.55) + '%';
-      $('b', lv).textContent = v === undefined ? '—' : v;
-    }
-  });
 
   params($('#inputParams'), [
     ['DMX', st.dmx.live ? `${st.dmx.fps} fps · ${st.dmx.slots} slots` : (c && !c.dmx.enabled ? 'disabled' : 'no signal')],
@@ -820,24 +825,79 @@ $$('#manualBtns [data-all]').forEach(b => b.addEventListener('click', () => {
   api('/api/relays', { all: b.dataset.all === '1' }).then(poll).catch(err => toast(err.message, true));
 }));
 
+function setOnline(on) {
+  if (on && offline && !cfg) loadConfig();
+  offline = !on;
+  setBadge($('#connBadge'), on ? 'live' : 'bad');
+  $('#connText').textContent = on ? 'Online' : 'Offline';
+}
+
 async function poll() {
   try {
     st = await api('/api/status');
-    if (offline) { offline = false; if (!cfg) loadConfig(); }
-    setBadge($('#connBadge'), 'live');
-    $('#connText').textContent = 'Online';
+    setOnline(true);
     renderStatus();
   } catch (e) {
-    offline = true;
-    setBadge($('#connBadge'), 'bad');
-    $('#connText').textContent = 'Offline';
+    setOnline(false);
   }
 }
-function startPolling() {
+
+// The device pushes changes over Server-Sent Events: relay flips immediately,
+// levels at up to ~30/s, full status once a second. Polling only covers gaps
+// (stream not up yet, device restarting, or a browser without EventSource).
+const SRC = [undefined, 'dmx', 'artnet', 'manual', 'hold'];
+let events = null, lastEvent = 0, liveFrame = 0;
+
+function applyLive(l) {
+  st.manual = l.man;
+  st.dmx.live = l.dl; st.dmx.fps = l.df;
+  st.artnet.live = l.al; st.artnet.fps = l.af;
+  st.relays = st.relays.map((r, i) => ({
+    on: !!(l.m >> i & 1),
+    dmx: l.d[i] >= 0 ? l.d[i] : undefined,
+    art: l.a[i] >= 0 ? l.a[i] : undefined,
+    src: SRC[l.s[i]],
+  }));
+}
+
+function openEvents() {
+  if (!window.EventSource || events) return;
+  events = new EventSource('/api/events');
+  events.addEventListener('status', e => {
+    st = JSON.parse(e.data);
+    lastEvent = Date.now();
+    setOnline(true);
+    renderStatus();
+  });
+  events.addEventListener('live', e => {
+    if (!st) return;
+    applyLive(JSON.parse(e.data));
+    lastEvent = Date.now();
+    // Coalesce bursts into one paint per frame.
+    if (!liveFrame) liveFrame = requestAnimationFrame(() => { liveFrame = 0; renderLive(); });
+  });
+}
+
+function closeEvents() {
+  if (events) events.close();
+  events = null;
+}
+
+function startLive() {
+  openEvents();
   clearInterval(polling);
-  polling = setInterval(() => { if (!document.hidden) poll(); }, 750);
+  polling = setInterval(() => {
+    if (document.hidden) return;
+    if (Date.now() - lastEvent > 2500) poll();  // stream stalled or unavailable
+  }, 1000);
   poll();
 }
+
+document.addEventListener('visibilitychange', () => {
+  // No point streaming to a hidden tab or a locked phone.
+  if (document.hidden) closeEvents();
+  else if (polling) { openEvents(); poll(); }
+});
 
 // ─── MAPPING PAGE ──────────────────────────────────────────
 function buildMap() {
@@ -1069,6 +1129,8 @@ function candidates() {
 // ─── SYSTEM PAGE ───────────────────────────────────────────
 function rebootOverlay(title, hosts) {
   clearInterval(polling);
+  polling = null;
+  closeEvents();
   $('#ovTitle').textContent = title;
   $('#ovText').textContent = 'The device is restarting. This page reconnects automatically.';
   const links = $('#ovLinks');
@@ -1145,7 +1207,7 @@ async function loadConfig() {
 buildRelays();
 buildMap();
 showTab(location.hash.slice(1) || 'status');
-loadConfig().then(startPolling);
+loadConfig().then(startLive);
 </script>
 </body>
 </html>
