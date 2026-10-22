@@ -13,6 +13,15 @@ into a DMX512 / Art-Net controlled 8-relay node, configured from a mobile-friend
 - Answers Art-Net `ArtPoll`, so consoles list it as a node
 - `http://dmx-relay.local/` through mDNS
 
+## Prebuilt firmware
+
+`firmware/` holds ready-to-use builds, so you don't need a toolchain:
+
+| File | Use it for |
+|---|---|
+| `dmx-relay-<version>.bin` | Updating a running device: **System → Firmware update** in the web UI, or `curl -F "firmware=@firmware/dmx-relay-1.1.0.bin" http://<device-ip>/api/update` |
+| `dmx-relay-<version>-factory.bin` | First flash or recovery over USB: `esptool --chip esp32s3 write-flash 0x0 firmware/dmx-relay-1.1.0-factory.bin` |
+
 ## Build & flash
 
 Requires [PlatformIO](https://platformio.org/). The project uses the
