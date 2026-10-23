@@ -9,7 +9,7 @@
 #include "sfx.h"
 #endif
 
-enum RelaySource : uint8_t { SRC_NONE, SRC_DMX, SRC_ART, SRC_MANUAL, SRC_HOLD, SRC_ANIM };
+enum RelaySource : uint8_t { SRC_NONE, SRC_DMX, SRC_ART, SRC_MANUAL, SRC_HOLD, SRC_ANIM, SRC_KEY };
 
 struct InputStatus {
   bool live;
@@ -40,4 +40,7 @@ void engineApply(const IoSettings &io);     // takes effect on the next cycle
 void engineSetManual(bool enabled);
 void engineSetManualRelay(int index, bool on);
 void engineSetManualAll(bool on);
+// Web keyboard: bit n = number key n+1 held, which acts like input channel n+1 at full.
+// The page repeats it while keys are held; it lapses if not repeated.
+void engineSetKeys(uint8_t mask);
 EngineStatus engineStatus();

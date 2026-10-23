@@ -210,8 +210,16 @@ body[data-tab=status] footer { display: none; }
 .arrow.stop { color: var(--danger); border-color: rgba(var(--danger-rgb),0.35); background: rgba(var(--danger-rgb),0.06); }
 .arrow.stop:hover { background: rgba(var(--danger-rgb),0.12); }
 .arrow.flash { box-shadow: 0 0 0 4px rgba(255,255,255,0.25); }
+/* Left and right span both rows; Stop and Center stack in the middle. */
+.arrows { grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr); grid-template-rows: 1fr 1fr; }
+.arrow[data-motor="left"], .arrow[data-motor="right"] { grid-row: span 2; }
+.arrow.mid { flex-direction: row; gap: 8px; min-height: 40px; }
 .anim-pos { font-family: var(--mono); font-size: 13px; color: var(--muted); margin: -6px 0 12px; position: relative; }
 .anim-toggles { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-top: 12px; position: relative; }
+.anim-random { display: flex; align-items: center; gap: 16px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); position: relative; }
+.anim-random .switch { flex-shrink: 0; }
+.anim-random input[type=range] { height: 32px; flex: 1; min-width: 80px; }
+.anim-random .mono { font-size: 13px; white-space: nowrap; min-width: 92px; text-align: right; color: var(--muted); }
 .kbd {
   display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 5px;
   font-family: var(--mono); font-size: 11px; font-weight: 600; line-height: 1; color: var(--muted);
@@ -470,6 +478,8 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
   .status-grid > .card, .relays-card { padding: 14px; }
   .anim-state { font-size: 19px; margin-bottom: 10px; }
   .arrow { min-height: 70px; }
+  .arrow.mid { min-height: 40px; }
+  .arrow.mid .kbd { display: none; }
   .anim-toggles { margin-top: 12px; }
   .relays { gap: 6px; }
   .relay { padding: 8px; gap: 5px; }
@@ -547,13 +557,19 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
       <div class="anim-pos" id="animPos">Not homed</div>
       <div class="arrows">
         <button class="arrow" type="button" data-motor="left"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 5l-7 7 7 7"/></svg>Left <span class="kbd">←</span></button>
-        <button class="arrow stop" type="button" data-motor="stop"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>Stop <span class="kbd">↓</span></button>
+        <button class="arrow stop mid" type="button" data-motor="stop"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>Stop <span class="kbd">↓</span></button>
         <button class="arrow" type="button" data-motor="right"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>Right <span class="kbd">→</span></button>
+        <button class="arrow mid center-btn" type="button" id="centerBtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Center <span class="kbd">Space</span></button>
       </div>
       <div class="anim-toggles">
         <label class="switch"><input type="checkbox" id="eyesToggle"><span class="track"></span>Eyes <span class="kbd">↑</span></label>
         <button class="btn btn-secondary btn-sm" type="button" id="homeBtn">Find center <span class="kbd">H</span></button>
         <label class="switch warn-switch" title="Let moves run past the max swing either side of center"><input type="checkbox" id="overrideToggle"><span class="track"></span>Ignore travel limit</label>
+      </div>
+      <div class="anim-random">
+        <label class="switch" title="Turn the head at random. Stop turns it off"><input type="checkbox" id="randomToggle"><span class="track"></span>Random <span class="kbd">R</span></label>
+        <input id="randomInterval" type="range" min="1" max="30" step="0.5" aria-label="Random interval" title="Typical time between changes; each one comes at a random time from half to one and a half times this">
+        <span class="mono" id="randomVal"></span>
       </div>
     </div>
 
@@ -576,7 +592,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
           <button class="btn btn-secondary btn-sm" data-all="1">All on</button>
           <button class="btn btn-secondary btn-sm" data-all="0">All off</button>
         </div>
-        <label class="switch warn-switch" title="Take the relays off DMX and Art-Net to test wiring, then tap a relay to switch it. Turns off again when the device restarts."><input type="checkbox" id="manualToggle"><span class="track"></span>Manual override</label>
+        <label class="switch warn-switch" title="Take the relays off DMX and Art-Net to test wiring, then tap a relay (or press its number key) to switch it. Turns off again when the device restarts."><input type="checkbox" id="manualToggle"><span class="track"></span>Manual override</label>
       </div>
     </div>
     <div class="relays" id="relays"></div>
@@ -971,7 +987,7 @@ function buildRelays() {
   }
 }
 
-const SRC_LABEL = { dmx: 'DMX', artnet: 'Art-Net', manual: 'manual', hold: 'holding', anim: 'animatronic' };
+const SRC_LABEL = { dmx: 'DMX', artnet: 'Art-Net', manual: 'manual', hold: 'holding', anim: 'animatronic', key: 'keyboard' };
 
 function renderLive() {
   if (!st) return;
@@ -1014,6 +1030,7 @@ function renderAnim() {
   if (!a) return;
   let text;
   if (a.home === 'searching') text = 'Finding center…';
+  else if (a.centering) text = 'Centering…';
   else if (a.dir !== 'stop') text = 'Moving ' + a.dir;
   else if (a.target !== 'stop') text = 'Reversing → ' + a.target;
   else if (a.reason === 'travel') text = 'Stopped · end of travel';
@@ -1021,7 +1038,12 @@ function renderAnim() {
   else if (a.reason === 'homed') text = 'Centered';
   else if (a.reason === 'homeFailed') text = 'Center not found';
   else text = 'Stopped';
+  const randomCfg = !!(cfg && cfg.anim.random);
+  if (a.random) text = 'Random · ' + text;
+  else if (randomCfg) text += ' · random paused (manual override)';
   $('#animState').textContent = text;
+  $('#randomToggle').checked = randomCfg;
+  if (cfg && !randomDragging) setRandomLabel(cfg.anim.randomInterval / 1000);
   const side = a.pos < 0 ? 'left' : 'right', off = Math.abs(a.pos) / 1000;
   $('#animPos').textContent = a.home === 'ok' ? (off < 0.05 ? 'At center' : `${off.toFixed(1)} s ${side} of center`)
     : a.home === 'searching' ? 'Swinging wider until the center switch closes'
@@ -1035,6 +1057,7 @@ function renderAnim() {
     b.classList.toggle('blocked', a.atLimit === d && !a.override);
   });
   setBadge($('#animCenter'), a.center ? 'live' : '', 'contact ' + (a.closed ? 'closed' : 'open'));
+  $('#centerBtn').classList.toggle('active', !!a.centering);
   $('#eyesToggle').checked = a.eyes;
   $('#overrideToggle').checked = a.override;
 }
@@ -1095,11 +1118,44 @@ function renderStatus() {
   ]);
 }
 
-$$('.arrow[data-motor]').forEach(b => b.addEventListener('click', () => {
-  api('/api/anim', { motor: b.dataset.motor }).catch(err => toast(err.message, true));
-}));
+$$('.arrow[data-motor]').forEach(b => b.addEventListener('click', () => motorCommand(b.dataset.motor)));
 $('#eyesToggle').addEventListener('change', e => {
   api('/api/anim', { eyes: e.target.checked }).catch(err => toast(err.message, true));
+});
+// Random mode lives in the settings so it survives a restart.
+let randomDragging = false;
+function setRandomLabel(s) {
+  const r = $('#randomInterval');
+  r.value = s;
+  r.style.setProperty('--p', ((s - r.min) / (r.max - r.min) * 100) + '%');
+  const f = v => (Math.round(v * 10) / 10) + '';
+  $('#randomVal').textContent = `~${f(s)} s (${f(s / 2)}–${f(s * 1.5)})`;
+}
+async function setRandom(anim) {
+  try {
+    cfg = (await api('/api/config', { anim })).config;
+    renderAnim();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+$('#randomToggle').addEventListener('change', e => setRandom({ random: e.target.checked }));
+$('#randomInterval').addEventListener('input', e => {
+  randomDragging = true;
+  setRandomLabel(+e.target.value);
+});
+$('#randomInterval').addEventListener('change', async e => {
+  await setRandom({ randomInterval: Math.round(+e.target.value * 1000) });
+  randomDragging = false;
+});
+// Stop means stop everything, random mode included.
+function motorCommand(motor) {
+  if (motor === 'stop' && cfg && cfg.anim.random) setRandom({ random: false });
+  api('/api/anim', { motor }).catch(err => toast(err.message, true));
+}
+
+$('#centerBtn').addEventListener('click', () => {
+  api('/api/anim', { center: true }).catch(err => toast(err.message, true));
 });
 $('#homeBtn').addEventListener('click', () => {
   api('/api/anim', { home: true }).catch(err => toast(err.message, true));
@@ -1276,13 +1332,30 @@ $('#usbAudio').addEventListener('change', async e => {
   }
 });
 
-// Keyboard: ← left, → right, ↓ stop, ↑ eyes on/off, H find center. Status page only, and never while typing.
+// Keyboard: ← left, → right, ↓ stop, ↑ eyes on/off, Space back to center, H find center, R random.
+// Status page only, and never while typing.
+const keysActive = e => st && st.anim && $('#page-status').classList.contains('active') &&
+  !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey &&
+  !e.target.closest('select, textarea, input:not([type=checkbox]):not([type=range])');
 document.addEventListener('keydown', e => {
-  if (!st || !st.anim || !$('#page-status').classList.contains('active')) return;
-  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.target.closest('input, select, textarea')) return;
+  if (!keysActive(e)) return;
+  if (e.key === ' ') {
+    e.preventDefault();  // not a page scroll, and not a click on whatever button has focus
+    if (e.repeat) return;
+    const b = $('#centerBtn');
+    b.classList.add('flash');
+    setTimeout(() => b.classList.remove('flash'), 150);
+    b.click();
+    return;
+  }
+  if (e.target.closest('input')) return;  // arrows stay with a focused slider or switch
   const motor = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'stop' }[e.key];
   if (e.key === 'h' || e.key === 'H') {
     if (!e.repeat) $('#homeBtn').click();
+    return;
+  }
+  if (e.key === 'r' || e.key === 'R') {
+    if (!e.repeat && cfg) setRandom({ random: !cfg.anim.random });
     return;
   }
   if (!motor && e.key !== 'ArrowUp') return;
@@ -1292,7 +1365,7 @@ document.addEventListener('keydown', e => {
     const b = $(`.arrow[data-motor="${motor}"]`);
     b.classList.add('flash');
     setTimeout(() => b.classList.remove('flash'), 150);
-    api('/api/anim', { motor }).catch(err => toast(err.message, true));
+    motorCommand(motor);
   } else {
     const eyes = !st.anim.eyes;
     st.anim.eyes = eyes;
@@ -1300,6 +1373,44 @@ document.addEventListener('keydown', e => {
     api('/api/anim', { eyes }).catch(err => toast(err.message, true));
   }
 });
+// Number keys 1-8, status page, both builds. In manual override a press toggles that relay,
+// like tapping its tile. Otherwise holding a key acts like its input channel at full: whatever
+// is mapped to the channel triggers, and letting go drops it back to 0.
+let keysHeld = 0, keysTimer = null;
+function sendKeys() {
+  api('/api/keys', { keys: keysHeld }).catch(() => {});
+  clearInterval(keysTimer);
+  keysTimer = keysHeld ? setInterval(() => api('/api/keys', { keys: keysHeld }).catch(() => {}), 500) : null;
+}
+function releaseKeys() {
+  if (keysHeld) { keysHeld = 0; sendKeys(); }
+}
+const numberKeysActive = e => st && $('#page-status').classList.contains('active') &&
+  !e.metaKey && !e.ctrlKey && !e.altKey && !e.target.closest('select, textarea, input:not([type=checkbox]):not([type=range])');
+document.addEventListener('keydown', e => {
+  const n = '12345678'.indexOf(e.key);
+  if (n < 0 || !numberKeysActive(e)) return;
+  e.preventDefault();
+  if (e.repeat) return;
+  if (st.manual) {
+    $$('.relay')[n].click();
+  } else if (!(keysHeld & 1 << n)) {
+    keysHeld |= 1 << n;
+    sendKeys();
+  }
+});
+document.addEventListener('keyup', e => {
+  const n = '12345678'.indexOf(e.key);
+  if (n >= 0 && keysHeld & 1 << n) {
+    keysHeld &= ~(1 << n);
+    sendKeys();
+  }
+});
+window.addEventListener('blur', releaseKeys);
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseKeys(); });
+
+// Buttons and switches activate on Space's keyup; that's Center's key here.
+document.addEventListener('keyup', e => { if (e.key === ' ' && keysActive(e)) e.preventDefault(); });
 
 $('#manualToggle').addEventListener('change', e => {
   api('/api/relays', { manual: e.target.checked }).then(poll).catch(err => toast(err.message, true));
@@ -1328,7 +1439,7 @@ async function poll() {
 // The device pushes changes over Server-Sent Events: relay flips immediately,
 // levels at up to ~30/s, full status once a second. Polling only covers gaps
 // (stream not up yet, device restarting, or a browser without EventSource).
-const SRC = [undefined, 'dmx', 'artnet', 'manual', 'hold', 'anim'];
+const SRC = [undefined, 'dmx', 'artnet', 'manual', 'hold', 'anim', 'key'];
 const DIRS = ['stop', 'left', 'right'], REASONS = [undefined, 'user', 'travel', 'timeout', 'input', 'homed', 'homeFailed'];
 const HOMES = ['none', 'searching', 'ok', 'failed'];
 let events = null, lastEvent = 0, liveFrame = 0;
@@ -1346,8 +1457,8 @@ function applyLive(l) {
   if (l.id) st.inputs = { dmx: l.id, art: l.ia };
   if (l.sx && st.sfx) [st.sfx.playing, st.sfx.volume, st.sfx.volumeFromInput] = l.sx;
   if (l.an) {
-    const [dir, target, atLimit, reason, center, closed, override, eyes, home, pos] = l.an;
-    st.anim = { dir: DIRS[dir], target: DIRS[target], atLimit: DIRS[atLimit], reason: REASONS[reason], center, closed, override, eyes, home: HOMES[home], pos };
+    const [dir, target, atLimit, reason, center, closed, override, eyes, home, pos, centering, random] = l.an;
+    st.anim = { dir: DIRS[dir], target: DIRS[target], atLimit: DIRS[atLimit], reason: REASONS[reason], center, closed, override, eyes, home: HOMES[home], pos, centering, random };
   }
 }
 

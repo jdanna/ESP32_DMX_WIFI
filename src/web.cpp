@@ -20,7 +20,7 @@ namespace {
 WebServer server(80);
 uint32_t rebootAt;
 
-const char *SOURCE_NAMES[] = {nullptr, "dmx", "artnet", "manual", "hold", "anim"};
+const char *SOURCE_NAMES[] = {nullptr, "dmx", "artnet", "manual", "hold", "anim", "key"};
 
 // Live updates are pushed as Server-Sent Events. The relay engine runs in a
 // higher-priority task and DMX in an ISR, so nothing here can delay them.
@@ -129,6 +129,8 @@ void buildStatus(JsonObject root) {
   an["eyes"] = st.anim.eyes;
   an["home"] = homeStateName(st.anim.home);
   an["pos"] = st.anim.posMs;
+  an["centering"] = st.anim.centering;
+  an["random"] = st.anim.random;
 
   JsonObject sx = root["sfx"].to<JsonObject>();
   sfxStatusJson(sx);
@@ -163,7 +165,7 @@ String liveJson(const EngineStatus &st) {
     ia.add(st.inArt[i]);
   }
 #ifdef ANIMATRONIC
-  // [dir, target, atLimit, reason, center, closed, override, eyes, home, position ms]
+  // [dir, target, atLimit, reason, center, closed, override, eyes, home, position ms, centering, random]
   JsonArray an = doc["an"].to<JsonArray>();
   an.add((int)st.anim.dir);
   an.add((int)st.anim.target);
@@ -175,6 +177,8 @@ String liveJson(const EngineStatus &st) {
   an.add(st.anim.eyes);
   an.add((int)st.anim.home);
   an.add(st.anim.posMs);
+  an.add(st.anim.centering);
+  an.add(st.anim.random);
   // [playing mask, volume %, volume set by an input]
   JsonArray sx = doc["sx"].to<JsonArray>();
   sx.add(sfxPlayingMask());
@@ -340,6 +344,20 @@ void handlePostConfig() {
   if (networkChanged) scheduleReboot();
 }
 
+// {"keys": mask}: number keys held on the web page, bit n = channel n+1.
+void handleKeys() {
+  JsonDocument in;
+  if (!readBody(in)) return;
+  if (!in["keys"].is<int>()) {
+    sendError(400, "keys must be a number");
+    return;
+  }
+  engineSetKeys(in["keys"].as<int>() & 0xff);
+  JsonDocument doc;
+  doc["ok"] = true;
+  sendJson(200, doc);
+}
+
 void handleRelays() {
   JsonDocument in;
   if (!readBody(in)) return;
@@ -358,6 +376,7 @@ void handleAnim() {
   if (in["override"].is<bool>()) animOverride(in["override"]);
   if (in["eyes"].is<bool>()) animEyes(in["eyes"]);
   if (in["home"] == true) animHome();
+  if (in["center"] == true) animCenter();
   if (!in["motor"].isNull()) {
     const char *m = in["motor"];
     MotorDir dir;
@@ -556,6 +575,7 @@ void webBegin() {
   server.on("/api/config", HTTP_GET, handleGetConfig);
   server.on("/api/config", HTTP_POST, handlePostConfig);
   server.on("/api/relays", HTTP_POST, handleRelays);
+  server.on("/api/keys", HTTP_POST, handleKeys);
 #ifdef ANIMATRONIC
   server.on("/api/anim", HTTP_POST, handleAnim);
   server.on("/api/sfx", HTTP_POST, handleSfx);

@@ -8,6 +8,9 @@
 // it passes center, and moves stop at the max swing time either side of center.
 // The last position is saved, so after a restart homing runs straight toward
 // center first and only falls back to the widening search if it isn't there.
+//
+// Random mode turns the head to random points within the travel, at random
+// intervals around the configured time. It doesn't touch the eyes.
 #pragma once
 
 #include <Arduino.h>
@@ -30,6 +33,8 @@ struct AnimStatus {
   bool eyes;
   HomeState home;
   int32_t posMs;     // run time from center, left negative; meaningful once homed
+  bool centering;    // driving back to center
+  bool random;       // random mode running (on, and not paused by manual override)
 };
 
 void animBegin();
@@ -37,13 +42,14 @@ void animLoop();  // from the main loop: saves the last known position to flash
 
 // Runs every engine cycle. `inputMask` is what DMX/Art-Net ask the functions to do (bit = AnimFn);
 // a change in it acts like pressing a button. `inputEnabled` is false in manual
-// override, so the console can't move the motor then. Returns relay bits 0-2.
+// override, so neither the console nor random mode can move the motor then. Returns relay bits 0-2.
 uint8_t animUpdate(uint32_t now, const AnimSettings &s, uint8_t inputMask, bool inputEnabled, AnimStatus &st);
 
 // Web controls. animMotor refuses to drive further past the travel limit unless overridden,
 // and cancels homing.
 bool animMotor(MotorDir dir, String &err);
 void animHome();
+void animCenter();  // drive back to center; homes first if the position isn't known
 void animEyes(bool on);
 void animOverride(bool on);
 

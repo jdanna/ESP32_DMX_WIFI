@@ -150,6 +150,8 @@ void configToJson(const Config &cfg, JsonObject out, bool includeSecrets) {
   an["reverseDelay"] = cfg.io.anim.reverseDelayMs;
   an["maxSwing"] = cfg.io.anim.maxSwingMs;
   an["homeOnBoot"] = cfg.io.anim.homeOnBoot;
+  an["random"] = cfg.io.anim.random;
+  an["randomInterval"] = cfg.io.anim.randomIntervalMs;
   an["limitType"] = cfg.io.anim.limitNc ? "nc" : "no";
   an["swap"] = cfg.io.anim.swap;
   JsonArray fnMap = an["map"].to<JsonArray>();
@@ -281,6 +283,9 @@ bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkC
     if (readRanged(an["maxSwing"], 100, 30000, n, "Max swing", err)) c.io.anim.maxSwingMs = n;
     if (err.length()) return false;
     if (an["homeOnBoot"].is<bool>()) c.io.anim.homeOnBoot = an["homeOnBoot"];
+    if (an["random"].is<bool>()) c.io.anim.random = an["random"];
+    if (readRanged(an["randomInterval"], 1000, 30000, n, "Random interval", err)) c.io.anim.randomIntervalMs = n;
+    if (err.length()) return false;
     if (!an["limitType"].isNull()) {
       const char *t = an["limitType"];
       if (!t || (strcmp(t, "no") && strcmp(t, "nc"))) {

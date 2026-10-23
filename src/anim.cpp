@@ -1,6 +1,7 @@
 #include "anim.h"
 
 #include <Preferences.h>
+#include <esp_random.h>
 #include "board.h"
 #include "log.h"
 
@@ -12,6 +13,8 @@ constexpr uint32_t BOOT_HOME_DELAY_MS = 2000;
 constexpr uint32_t SAVE_AFTER_MS = 1000;     // save the position once the head has been still this long
 constexpr int32_t SAVE_MIN_CHANGE_MS = 20;   // ...and it moved at least this much since the last save
 const char *NVS_NS = "anim", *NVS_POS = "pos";
+constexpr int32_t RANDOM_REACH_PCT = 80;     // random targets stay within this much of the max swing
+constexpr uint32_t RANDOM_START_MS = 500;    // first random change this soon after turning it on
 
 const char *DIR_NAMES[] = {"stop", "left", "right"};
 const char *REASON_NAMES[] = {nullptr, "user", "travel", "timeout", "input", "homed", "homeFailed"};
@@ -22,7 +25,7 @@ portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 MotorDir target = MOTOR_STOP;
 StopReason reason = STOP_NONE;
 HomeState home = HOME_NONE;
-bool override = false, eyes = false, homeRequested = false, posKnown = false;
+bool override = false, eyes = false, homeRequested = false, centerRequested = false, posKnown = false;
 int32_t posMs, limitMs = 2500;
 // Last known position, kept in NVS across restarts so homing can head for center
 // first. The engine task decides what to save; animLoop() does the slow flash write.
@@ -36,12 +39,23 @@ MotorDir dir = MOTOR_STOP, lastMoveDir = MOTOR_STOP;
 uint32_t stopMs, runStartMs, rawSince, lastMs, idleSince;
 bool rawPrev, closed, centerPrev, bootHomeChecked;
 uint8_t inputPrev;
+// Driving back to center once homed; stops at the switch, or gives up this far past it.
+bool centering;
+int32_t centerOverrunMs;
+// Random mode: the next change is due at randomDueMs; gotoActive while the head
+// runs to gotoMs. Engine task only, except gotoActive which request() clears.
+bool randomPrev, randomArm, gotoActive;
+uint32_t randomDueMs;
+int32_t gotoMs;
 // Homing search, relative to where it started. directMs > 0 while making the first,
 // straight run toward where the saved position says center is.
 int32_t relMs, ampMs, directMs;
 bool leftDone, rightDone, returning;
 // Things to log once the spinlock is released (logging can block).
-enum : uint8_t { EV_CENTERED = 1, EV_HOMING = 2, EV_HOME_FAILED = 4, EV_HOMING_SAVED = 8, EV_SAVED_MISSED = 16 };
+enum : uint8_t {
+  EV_CENTERED = 1, EV_HOMING = 2, EV_HOME_FAILED = 4, EV_HOMING_SAVED = 8, EV_SAVED_MISSED = 16, EV_CENTER_MISSED = 32,
+  EV_RANDOM_ON = 64, EV_RANDOM_OFF = 128
+};
 uint8_t events;
 
 // Caller holds mux.
@@ -54,6 +68,8 @@ MotorDir limitDir() {
 bool request(MotorDir want, StopReason why) {
   if (want != MOTOR_STOP && want == limitDir()) return false;
   if (home == HOME_SEARCHING) home = posKnown ? HOME_OK : HOME_NONE;  // a move or stop cancels homing
+  centering = false;
+  gotoActive = false;
   target = want;
   if (want == MOTOR_STOP) reason = why;
   return true;
@@ -90,6 +106,39 @@ void startHoming(bool center) {
     target = MOTOR_LEFT;
     events |= EV_HOMING;
   }
+}
+
+uint32_t rnd(uint32_t n) { return esp_random() % n; }
+
+uint32_t randomDelay(const AnimSettings &s) { return s.randomIntervalMs / 2 + rnd(s.randomIntervalMs + 1); }
+
+// Caller holds mux.
+void startCentering(bool center) {
+  if (center) {
+    target = MOTOR_STOP;
+    reason = STOP_HOMED;
+    return;
+  }
+  centering = true;
+  centerOverrunMs = max(2 * HOME_STEP_MS, abs(posMs) / 4);
+  target = posMs < 0 ? MOTOR_RIGHT : MOTOR_LEFT;
+}
+
+// Caller holds mux. One random turn of the head; every few turns, look straight ahead.
+void randomStep(bool center) {
+  if (!posKnown) return;
+  const int32_t reach = limitMs * RANDOM_REACH_PCT / 100;
+  if (rnd(5) == 0 && abs(posMs) > HOME_STEP_MS) {
+    startCentering(center);
+    return;
+  }
+  // Somewhere else in the range, far enough from here that it's a real turn.
+  int32_t to = posMs;
+  for (int i = 0; i < 8 && abs(to - posMs) < limitMs / 4; i++) to = (int32_t)rnd(2 * reach + 1) - reach;
+  if (abs(to - posMs) < limitMs / 4) return;
+  gotoActive = true;
+  gotoMs = to;
+  target = to < posMs ? MOTOR_LEFT : MOTOR_RIGHT;
 }
 
 // Caller holds mux. Called when the current swing reaches its end.
@@ -165,7 +214,40 @@ uint8_t animUpdate(uint32_t now, const AnimSettings &s, uint8_t inputMask, bool 
   }
   if (homeRequested) {
     homeRequested = false;
+    centering = false;
     startHoming(center);
+  }
+  if (centerRequested) {
+    centerRequested = false;
+    gotoActive = false;
+    if (!posKnown) {
+      if (home != HOME_SEARCHING) startHoming(center);  // homing ends at center too
+    } else {
+      startCentering(center);
+    }
+  }
+
+  // Random mode, paused in manual override. It waits for any move in progress,
+  // and homes first if the head's position isn't known.
+  const bool randomOn = s.random && inputEnabled;
+  if (randomOn != randomPrev) {
+    randomPrev = randomOn;
+    randomDueMs = now + RANDOM_START_MS;
+    if (!randomOn && gotoActive) {
+      gotoActive = false;
+      target = MOTOR_STOP;
+      reason = STOP_USER;
+    }
+    events |= randomOn ? EV_RANDOM_ON : EV_RANDOM_OFF;
+  }
+  const bool still = dir == MOTOR_STOP && target == MOTOR_STOP && home != HOME_SEARCHING && !centering;
+  if (randomOn && still && randomArm) {
+    randomArm = false;  // the last change has finished: the pause starts now
+    randomDueMs = now + randomDelay(s);
+  } else if (randomOn && still && now >= BOOT_HOME_DELAY_MS && (int32_t)(now - randomDueMs) >= 0) {
+    if (!posKnown && home == HOME_NONE) startHoming(center);
+    else randomStep(center);
+    randomArm = true;
   }
 
   // Console changes act like button presses; a level that just sits there doesn't
@@ -208,6 +290,24 @@ uint8_t animUpdate(uint32_t now, const AnimSettings &s, uint8_t inputMask, bool 
     } else if ((dir == MOTOR_LEFT && relMs <= -ampMs) || (dir == MOTOR_RIGHT && relMs >= ampMs)) {
       nextSwing();
     }
+  } else if (gotoActive) {
+    if ((dir == MOTOR_LEFT && posMs <= gotoMs) || (dir == MOTOR_RIGHT && posMs >= gotoMs) ||
+        (dir != MOTOR_STOP && dir == limitDir())) {
+      gotoActive = false;
+      target = MOTOR_STOP;
+      reason = STOP_NONE;
+    }
+  } else if (centering) {
+    if (center) {
+      centering = false;
+      target = MOTOR_STOP;
+      reason = STOP_HOMED;
+    } else if ((dir == MOTOR_LEFT && posMs <= -centerOverrunMs) || (dir == MOTOR_RIGHT && posMs >= centerOverrunMs)) {
+      centering = false;  // went well past where center should be without seeing the switch
+      target = MOTOR_STOP;
+      reason = STOP_NONE;
+      events |= EV_CENTER_MISSED;
+    }
   } else if (dir != MOTOR_STOP && !override) {
     if (posKnown && dir == limitDir()) {
       target = MOTOR_STOP;
@@ -244,7 +344,7 @@ uint8_t animUpdate(uint32_t now, const AnimSettings &s, uint8_t inputMask, bool 
     saveOp = SAVE_WRITE;
   }
 
-  st = {dir, target, limitDir(), reason, center, closed, override, eyes, home, posKnown ? posMs : 0};
+  st = {dir, target, limitDir(), reason, center, closed, override, eyes, home, posKnown ? posMs : 0, centering, randomOn};
   const bool eyesOn = eyes;
   const uint8_t ev = events;
   events = 0;
@@ -257,6 +357,10 @@ uint8_t animUpdate(uint32_t now, const AnimSettings &s, uint8_t inputMask, bool 
             saved < 0 ? "left" : "right", saved < 0 ? "right" : "left");
   if (ev & EV_SAVED_MISSED)
     logWarn("anim", "Center wasn't where the saved position said; searching the other side");
+  if (ev & EV_RANDOM_ON) logInfo("anim", "Random mode on, about every %.1f s", s.randomIntervalMs / 1000.0f);
+  if (ev & EV_RANDOM_OFF) logInfo("anim", "Random mode off");
+  if (ev & EV_CENTER_MISSED)
+    logWarn("anim", "Went past center without the switch closing; position may be off, use Find center");
   if (ev & EV_CENTERED) logInfo("anim", "Head centered: center switch found");
   if (ev & EV_HOME_FAILED) logError("anim", "Homing failed: center switch not found within %u ms either way", s.maxSwingMs);
 
@@ -273,6 +377,12 @@ bool animMotor(MotorDir want, String &err) {
   if (!ok)
     err = String("At the ") + DIR_NAMES[want] + " end of travel. Move the other way first, or turn on Ignore travel limit.";
   return ok;
+}
+
+void animCenter() {
+  portENTER_CRITICAL(&mux);
+  centerRequested = true;
+  portEXIT_CRITICAL(&mux);
 }
 
 void animHome() {

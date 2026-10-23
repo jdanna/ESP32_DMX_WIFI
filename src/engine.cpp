@@ -13,6 +13,7 @@ constexpr uint16_t OP_POLL = 0x2000;
 constexpr uint16_t OP_POLL_REPLY = 0x2100;
 constexpr uint16_t OP_DMX = 0x5000;
 constexpr uint32_t REFRESH_MS = 1000;  // rewrite the expander periodically even without changes
+constexpr uint32_t KEY_HOLD_MS = 1500;  // held keys lapse if the page stops repeating them (tab closed, network gone)
 #ifdef ANIMATRONIC
 constexpr uint8_t ANIM_MASK = ANIM_RELAY_MASK;  // relays driven by the animatronic controller
 #else
@@ -24,6 +25,9 @@ IoSettings pending;
 bool pendingNew = false;
 volatile bool manual = false;
 volatile uint8_t manualMask = 0;
+uint8_t keyMask;      // written by the web task under mux
+uint32_t keyUpdatedMs;
+bool everKey;
 EngineStatus shared = {};
 
 // Owned by the engine task.
@@ -45,6 +49,11 @@ bool expanderOk;
 uint32_t lastWriteMs, windowStartMs;
 uint16_t dmxFps, artFps;
 RelaySource sources[RELAY_COUNT];
+// Keyboard input for this cycle: keysNow = keys held; keyLive = a key was used within the
+// loss timeout, which counts as a live input so a released key reads as 0, not "signal lost".
+uint8_t keysNow;
+bool keyLive;
+bool keyVolume;  // the volume level came from a held key
 
 uint8_t packet[600];
 
@@ -133,6 +142,8 @@ void pollInputs(bool udpOpen) {
   }
 }
 
+bool keyHeld(int slot) { return slot && (keysNow >> (slot - 1)) & 1; }
+
 // Value of `slot` (1-8) of the configured range, or -1 if the input isn't live.
 int dmxValue(int slot, bool live) {
   if (!live || !slot) return -1;
@@ -158,7 +169,11 @@ bool useDmx(bool dmxLive, bool artLive, int dv, int av) {
 
 // Next state of an output driven by input `slot` (0 = unassigned), given whether it's on now.
 bool decide(int slot, bool on, bool dmxLive, bool artLive, int dv, int av, RelaySource &src) {
-  if (!dmxLive && !artLive) {
+  if (keyHeld(slot)) {
+    src = SRC_KEY;
+    return true;
+  }
+  if (!dmxLive && !artLive && !keyLive) {
     if (io.loss == LOSS_OFF || !on) {
       src = SRC_NONE;
       return false;
@@ -166,7 +181,7 @@ bool decide(int slot, bool on, bool dmxLive, bool artLive, int dv, int av, Relay
     src = SRC_HOLD;
     return true;
   }
-  if (!slot) {
+  if (!slot || (!dmxLive && !artLive)) {  // unassigned, or only the keyboard is live and this key is up
     src = SRC_NONE;
     return false;
   }
@@ -181,6 +196,12 @@ void evaluate(uint32_t now, EngineStatus &st) {
   const bool artLive = io.artEnabled && everArt && now - artLastMs < io.lossTimeoutMs;
   const bool man = manual;
   const uint8_t manMask = manualMask;
+  portENTER_CRITICAL(&mux);
+  keysNow = keyMask;
+  const uint32_t keyAt = keyUpdatedMs;
+  portEXIT_CRITICAL(&mux);
+  if (now - keyAt > KEY_HOLD_MS) keysNow = 0;
+  keyLive = everKey && now - keyAt < io.lossTimeoutMs;
 
   for (int i = 0; i < RELAY_COUNT; i++) {
     const int slot = io.map[i];
@@ -219,7 +240,9 @@ void evaluate(uint32_t now, EngineStatus &st) {
   if (an.singleDir) {
     constexpr uint8_t MOTOR_BITS = (1 << FN_LEFT) | (1 << FN_RIGHT);
     const int slot = an.dirSlot;
-    if (dmxLive || artLive) {
+    if (keyHeld(slot)) {
+      fnMask = (fnMask & ~MOTOR_BITS) | (1 << FN_RIGHT);  // full = right
+    } else if (dmxLive || artLive) {
       fnMask &= ~MOTOR_BITS;
       if (slot) {
         const int dv = dmxValue(slot, dmxLive), av = artValue(slot, artLive);
@@ -227,8 +250,8 @@ void evaluate(uint32_t now, EngineStatus &st) {
         if (v < an.center - an.deadZone) fnMask |= 1 << FN_LEFT;
         else if (v > an.center + an.deadZone) fnMask |= 1 << FN_RIGHT;
       }
-    } else if (io.loss == LOSS_OFF) {
-      fnMask &= ~MOTOR_BITS;
+    } else if (keyLive || io.loss == LOSS_OFF) {
+      fnMask &= ~MOTOR_BITS;  // a released key stops it rather than reading 0 = left
     }
   }
 
@@ -242,11 +265,16 @@ void evaluate(uint32_t now, EngineStatus &st) {
   }
   // The volume channel overrides the web volume while live, and holds or drops on signal loss like a relay.
   const int vslot = io.sfx.volSlot;
-  if (vslot && (dmxLive || artLive)) {
+  if (keyHeld(vslot)) {
+    inputVolume = 255;
+    keyVolume = true;
+  } else if (vslot && (dmxLive || artLive)) {
     const int dv = dmxValue(vslot, dmxLive), av = artValue(vslot, artLive);
     inputVolume = useDmx(dmxLive, artLive, dv, av) ? dv : av;
-  } else if (!vslot || io.loss == LOSS_OFF) {
-    inputVolume = -1;
+    keyVolume = false;
+  } else if (!vslot || io.loss == LOSS_OFF || keyVolume) {
+    inputVolume = -1;  // a released key hands the volume back
+    keyVolume = false;
   }
   const uint8_t volume = inputVolume >= 0 ? (inputVolume * 100 + 127) / 255 : io.sfx.volume;
   sfxInput(sfxMask, !man, volume, inputVolume >= 0);
@@ -346,6 +374,15 @@ void engineSetManualRelay(int index, bool on) {
 }
 
 void engineSetManualAll(bool on) { manualMask = on ? 0xff : 0x00; }
+
+void engineSetKeys(uint8_t mask) {
+  const uint32_t now = millis();
+  portENTER_CRITICAL(&mux);
+  keyMask = mask;
+  keyUpdatedMs = now;
+  everKey = true;
+  portEXIT_CRITICAL(&mux);
+}
 
 EngineStatus engineStatus() {
   portENTER_CRITICAL(&mux);

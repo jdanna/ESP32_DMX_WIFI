@@ -39,6 +39,8 @@ struct AnimSettings {
   uint16_t reverseDelayMs = 500;  // both relays off this long before the motor changes direction
   uint16_t maxSwingMs = 2500;     // furthest the head runs either side of center, also the homing search limit
   bool homeOnBoot = true;         // find center by itself after power-up
+  bool random = false;            // random head moves and eye changes
+  uint16_t randomIntervalMs = 6000;  // typical time between random changes; each one is 0.5-1.5x this
   bool limitNc = false;           // center switch is normally closed (opens at center)
   bool swap = false;              // swap which relay drives left and right
   uint8_t map[ANIM_FN_COUNT] = {1, 2, 3};  // function -> slot in range (1-8), 0 = unassigned

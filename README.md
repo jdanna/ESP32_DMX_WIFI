@@ -52,6 +52,8 @@ level filter and download. The USB speaker's bring-up is logged step by step, so
 - Relay **on** when its channel ≥ threshold (default 128).
 - Both inputs live → **HTP** (default), **LTP**, **Prefer DMX** or **Prefer Art-Net**.
 - Signal lost (default 5 s) → **hold** (default) or **all off**. Relays start off at power-up.
+- **Number keys 1–8** on the Status page: holding one acts like that input channel at full (released = 0), so
+  whatever is mapped to it triggers, even with no DMX connected. In manual override a press toggles that relay.
 - Art-Net universe = 15-bit port-address: `10` = Net 0 · Sub-Net 0 · Uni 10.
 
 Test Art-Net: `python3 tools/artnet_test.py <ip> --universe 10`
@@ -69,8 +71,12 @@ shares the settings storage, so switching builds keeps the network and DMX setup
 | DI1 | Center switch (closes when the head faces forward), dry contact between **DI1** and **DGND** |
 | USB-C | USB speaker for sound effects (USB Audio Class 1.0) |
 
-- **Status:** Left / Stop / Right (keys **← ↓ →**), Eyes (**↑**), Find center (**H**), ignore travel limit, 4 sound
-  slots with upload, volume.
+- **Status:** Left / Stop / Right (keys **← ↓ →**), Eyes (**↑**), Center (**Space**) drives back to center,
+  Find center (**H**) re-homes, Random (**R**) with its interval slider, ignore travel limit, 4 sound slots with
+  upload, volume.
+- **Random:** turns the head to random points within 80% of the max swing (now and then straight ahead), each
+  turn 0.5–1.5× the interval after the last one finishes (slider 1–30 s, default 6 s). The eyes stay manual. It homes first
+  if needed, waits for a move to finish, pauses in manual override, and Stop turns it off. Saved with the settings.
 - **Homing:** at power-up (2 s in, can be turned off) or on **Find center**, the head swings left, then right, each
   swing 250 ms further from where it started, up to the **max swing** (default 2.5 s), until the center switch
   closes. If it's not found either way the head goes back to where it started. The last known position is saved,
@@ -87,7 +93,7 @@ shares the settings storage, so switching builds keeps the network and DMX setup
   doesn't put 5 V on that port, so the speaker needs 5 V fed onto VBUS, e.g. a USB-C OTG adapter with a power input.
   A powered hub alone doesn't work: hubs only connect when they see 5 V from the host. Flash over USB by holding **BOOT**.
 
-Extra API: `POST /api/anim` `{"motor":"left"|"right"|"stop"}`, `{"home":true}`, `{"eyes":true}`, `{"override":true}` ·
+Extra API: `POST /api/anim` `{"motor":"left"|"right"|"stop"}`, `{"center":true}`, `{"home":true}`, `{"eyes":true}`, `{"override":true}` ·
 `POST /api/sfx` `{"play":0}`, `{"stop":0}`, `{"delete":0}` · `POST /api/sfx/upload?slot=1&name=…` (multipart WAV).
 
 The USB Audio Class driver is Espressif's `usb_host_uac`, vendored in `lib/usb_host_uac` (Apache-2.0).
@@ -110,6 +116,7 @@ RS485 **A** = DMX+ (XLR 3), **B** = DMX− (XLR 2). Fit the 120 Ω jumper on the
 | `GET /api/events` | Live updates (SSE) |
 | `GET/POST /api/config` | Settings (partial JSON on POST) |
 | `POST /api/relays` | `{"manual":true}`, `{"index":0,"on":true}`, `{"all":false}` |
+| `POST /api/keys` | `{"keys":5}`: channels held at full, bit 0 = channel 1; repeat within 1.5 s or it lapses |
 | `GET /api/scan` | Wi-Fi scan |
 | `GET /api/log?after=N` | Log entries newer than N · `POST /api/log` `{"clear":true}` |
 | `POST /api/update` | Firmware upload |
