@@ -18,10 +18,16 @@ void configDefaults(Config &cfg) {
   strlcpy(cfg.hostname, "dmx-relay", sizeof(cfg.hostname));
   cfg.wifiSsid[0] = 0;
   cfg.wifiPass[0] = 0;
+  for (int i = 0; i < SFX_COUNT; i++) cfg.sfxNames[i][0] = 0;
   for (int i = 0; i < RELAY_COUNT; i++) {
     cfg.io.map[i] = i + 1;
     snprintf(cfg.relayNames[i], sizeof(cfg.relayNames[i]), "Relay %d", i + 1);
   }
+#ifdef ANIMATRONIC
+  strlcpy(cfg.relayNames[0], "Motor left", sizeof(cfg.relayNames[0]));
+  strlcpy(cfg.relayNames[1], "Motor right", sizeof(cfg.relayNames[1]));
+  strlcpy(cfg.relayNames[2], "Eyes", sizeof(cfg.relayNames[2]));
+#endif
 }
 
 // ─── JSON helpers ──────────────────────────────────────────────────────
@@ -138,6 +144,30 @@ void configToJson(const Config &cfg, JsonObject out, bool includeSecrets) {
     map.add(cfg.io.map[i]);
     names.add(cfg.relayNames[i]);
   }
+
+  JsonObject an = out["anim"].to<JsonObject>();
+  an["reverseDelay"] = cfg.io.anim.reverseDelayMs;
+  an["limitIgnore"] = cfg.io.anim.limitIgnoreMs;
+  an["maxRun"] = cfg.io.anim.maxRunS;
+  an["limitType"] = cfg.io.anim.limitNc ? "nc" : "no";
+  an["swap"] = cfg.io.anim.swap;
+  JsonArray fnMap = an["map"].to<JsonArray>();
+  for (int f = 0; f < ANIM_FN_COUNT; f++) fnMap.add(cfg.io.anim.map[f]);
+  an["motorMode"] = cfg.io.anim.singleDir ? "single" : "dual";
+  an["dirChannel"] = cfg.io.anim.dirSlot;
+  an["center"] = cfg.io.anim.center;
+  an["deadZone"] = cfg.io.anim.deadZone;
+
+  JsonObject sx = out["sfx"].to<JsonObject>();
+  sx["usbAudio"] = cfg.usbAudio;
+  sx["volume"] = cfg.io.sfx.volume;
+  sx["volChannel"] = cfg.io.sfx.volSlot;
+  JsonArray sxMap = sx["map"].to<JsonArray>();
+  JsonArray sxNames = sx["names"].to<JsonArray>();
+  for (int i = 0; i < SFX_COUNT; i++) {
+    sxMap.add(cfg.io.sfx.map[i]);
+    sxNames.add(cfg.sfxNames[i]);
+  }
 }
 
 bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkChanged) {
@@ -243,12 +273,121 @@ bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkC
     }
   }
 
+  JsonObjectConst an = in["anim"];
+  if (!an.isNull()) {
+    if (readRanged(an["reverseDelay"], 0, 10000, n, "Reverse delay", err)) c.io.anim.reverseDelayMs = n;
+    if (err.length()) return false;
+    if (readRanged(an["limitIgnore"], 0, 10000, n, "Limit ignore time", err)) c.io.anim.limitIgnoreMs = n;
+    if (err.length()) return false;
+    if (readRanged(an["maxRun"], 0, 3600, n, "Max run time", err)) c.io.anim.maxRunS = n;
+    if (err.length()) return false;
+    if (!an["limitType"].isNull()) {
+      const char *t = an["limitType"];
+      if (!t || (strcmp(t, "no") && strcmp(t, "nc"))) {
+        err = "Limit switch type must be no or nc";
+        return false;
+      }
+      c.io.anim.limitNc = strcmp(t, "nc") == 0;
+    }
+    if (an["swap"].is<bool>()) c.io.anim.swap = an["swap"];
+    JsonArrayConst fnMap = an["map"];
+    if (!fnMap.isNull()) {
+      if (fnMap.size() < ANIM_FN_COUNT) {  // older settings carry a 4th, unused entry
+        err = "Animatronic map must have 3 entries";
+        return false;
+      }
+      for (int f = 0; f < ANIM_FN_COUNT; f++) {
+        if (!readRanged(fnMap[f], 0, RELAY_COUNT, n, "Animatronic channel", err)) {
+          if (!err.length()) err = "Animatronic channel missing";
+          return false;
+        }
+        c.io.anim.map[f] = n;
+      }
+    }
+    if (!an["motorMode"].isNull()) {
+      const char *m = an["motorMode"];
+      if (!m || (strcmp(m, "dual") && strcmp(m, "single"))) {
+        err = "Motor mode must be dual or single";
+        return false;
+      }
+      c.io.anim.singleDir = strcmp(m, "single") == 0;
+    }
+    if (readRanged(an["dirChannel"], 0, RELAY_COUNT, n, "Direction channel", err)) c.io.anim.dirSlot = n;
+    if (err.length()) return false;
+    if (readRanged(an["center"], 1, 254, n, "Center value", err)) c.io.anim.center = n;
+    if (err.length()) return false;
+    if (readRanged(an["deadZone"], 0, 127, n, "Dead zone", err)) c.io.anim.deadZone = n;
+    if (err.length()) return false;
+    if (!c.io.anim.singleDir && c.io.anim.map[FN_LEFT] && c.io.anim.map[FN_LEFT] == c.io.anim.map[FN_RIGHT]) {
+      err = "Motor left and right can't share a channel";
+      return false;
+    }
+  }
+
+  JsonObjectConst sx = in["sfx"];
+  if (!sx.isNull()) {
+    if (sx["usbAudio"].is<bool>()) c.usbAudio = sx["usbAudio"];
+    if (readRanged(sx["volume"], 0, 100, n, "Volume", err)) c.io.sfx.volume = n;
+    if (err.length()) return false;
+    if (readRanged(sx["volChannel"], 0, RELAY_COUNT, n, "Volume channel", err)) c.io.sfx.volSlot = n;
+    if (err.length()) return false;
+    JsonArrayConst sxMap = sx["map"];
+    if (!sxMap.isNull()) {
+      if (sxMap.size() != SFX_COUNT) {
+        err = "Sound map must have 4 entries";
+        return false;
+      }
+      for (int i = 0; i < SFX_COUNT; i++) {
+        if (!readRanged(sxMap[i], 0, RELAY_COUNT, n, "Sound channel", err)) {
+          if (!err.length()) err = "Sound channel missing";
+          return false;
+        }
+        c.io.sfx.map[i] = n;
+      }
+    }
+    JsonArrayConst sxNames = sx["names"];
+    for (int i = 0; i < SFX_COUNT && i < (int)sxNames.size(); i++)
+      if (sxNames[i].is<const char *>()) strlcpy(c.sfxNames[i], sxNames[i], sizeof(c.sfxNames[i]));
+  }
+
+  // Network and USB-mode changes only take effect after a restart.
   networkChanged = strcmp(c.hostname, cfg.hostname) != 0 || !ipEqual(c.eth, cfg.eth) ||
                    c.wifiEnabled != cfg.wifiEnabled || strcmp(c.wifiSsid, cfg.wifiSsid) != 0 ||
-                   strcmp(c.wifiPass, cfg.wifiPass) != 0 || !ipEqual(c.wifi, cfg.wifi);
+                   strcmp(c.wifiPass, cfg.wifiPass) != 0 || !ipEqual(c.wifi, cfg.wifi) ||
+                   c.usbAudio != cfg.usbAudio;
   cfg = c;
   return true;
 }
+
+#ifdef ANIMATRONIC
+bool configMappingExclusive(const Config &cfg, String &err) {
+  const char *owner[RELAY_COUNT + 1] = {};
+  auto claim = [&](uint8_t slot, const char *name) {
+    if (!slot || slot > RELAY_COUNT) return true;
+    if (owner[slot]) {
+      err = String("Channel ") + slot + " is assigned to both " + owner[slot] + " and " + name;
+      return false;
+    }
+    owner[slot] = name;
+    return true;
+  };
+  const AnimSettings &an = cfg.io.anim;
+  if (an.singleDir) {
+    if (!claim(an.dirSlot, "motor direction")) return false;
+  } else if (!claim(an.map[FN_LEFT], "motor left") || !claim(an.map[FN_RIGHT], "motor right")) {
+    return false;
+  }
+  if (!claim(an.map[FN_EYES], "eyes")) return false;
+  static const char *SOUND_NAMES[SFX_COUNT] = {"sound 1", "sound 2", "sound 3", "sound 4"};
+  for (int i = 0; i < SFX_COUNT; i++)
+    if (!claim(cfg.io.sfx.map[i], SOUND_NAMES[i])) return false;
+  if (!claim(cfg.io.sfx.volSlot, "volume")) return false;
+  static const char *RELAY_NAMES[RELAY_COUNT] = {"relay 1", "relay 2", "relay 3", "relay 4", "relay 5", "relay 6", "relay 7", "relay 8"};
+  for (int i = 3; i < RELAY_COUNT; i++)  // relays 1-3 belong to the motor and eyes
+    if (!claim(cfg.io.map[i], RELAY_NAMES[i])) return false;
+  return true;
+}
+#endif
 
 // ─── NVS ───────────────────────────────────────────────────────────────
 
@@ -270,7 +409,11 @@ void configLoad(Config &cfg) {
   if (!configFromJson(cfg, doc.as<JsonObjectConst>(), err, changed)) {
     log_w("Stored config rejected (%s), using defaults", err.c_str());
     configDefaults(cfg);
+    return;
   }
+  // Settings saved before function mapping existed: the motor and eyes followed relays 1-3's channels.
+  if (doc["anim"]["map"].isNull())
+    for (int f = 0; f < ANIM_FN_COUNT; f++) cfg.io.anim.map[f] = cfg.io.map[f];
 }
 
 void configSave(const Config &cfg) {

@@ -11,6 +11,9 @@
 #include "engine.h"
 #include "net.h"
 #include "web.h"
+#ifdef ANIMATRONIC
+#include "sfx.h"
+#endif
 
 static constexpr uint32_t FACTORY_RESET_HOLD_MS = 5000;
 
@@ -58,10 +61,13 @@ void setup() {
   setLed(30, 16, 0);
 
   configLoad(g_cfg);
-  Serial.printf("\n[sys] DMX Relay Node %s - %s\n", FW_VERSION, g_cfg.hostname);
+  Serial.printf("\n[sys] DMX Relay Node %s (%s) - %s\n", FW_VERSION, FW_VARIANT, g_cfg.hostname);
 
   dmxBegin(PIN_RS485_TX, PIN_RS485_RX);
   netBegin(g_cfg);
+#ifdef ANIMATRONIC
+  sfxBegin(g_cfg.usbAudio);
+#endif
   engineBegin(g_cfg.io);
   webBegin();
   Serial.printf("[sys] Web UI at http://%s.local/\n", g_cfg.hostname);

@@ -152,48 +152,128 @@ h1 {
 .card.danger .card-title { color: var(--danger); }
 .card-desc { font-size: 13.5px; color: var(--muted); line-height: 1.55; margin-bottom: 18px; position: relative; }
 
+/* ─── STATUS PAGE ─────────────────────────────────────────── */
+body[data-tab=status] main { padding-top: calc(var(--nav-h) + 14px); padding-bottom: 14px; }
+body[data-tab=status] footer { display: none; }
+.status-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px 20px; flex-wrap: wrap; margin-bottom: 12px; }
+.status-bar .badges { margin-top: 0; }
+.status-sub { font-size: 13px; color: var(--muted); }
+.status-sub .mono { color: var(--text); }
+.status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.status-grid > .card { display: flex; flex-direction: column; padding: 16px 18px; }
+.status-grid .card-head, .relays-card .card-head { margin-bottom: 10px; }
+.head-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
+
 /* ─── RELAY TILES ─────────────────────────────────────────── */
-.relays { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.relays-card { padding: 14px 18px; }
+.relays { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; position: relative; }
 .relay {
-  display: flex; flex-direction: column; gap: 14px; text-align: left;
-  background: var(--surface); border: 1px solid var(--border);
-  border-top: 2px solid rgba(255,255,255,0.08);
-  border-radius: 16px; padding: 18px; position: relative; overflow: hidden; min-width: 0;
-  transition: border-color 0.2s, transform 0.2s, box-shadow 0.25s;
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  background: var(--surface2); border: 1px solid var(--border); border-top: 2px solid rgba(255,255,255,0.08);
+  border-radius: 12px; padding: 8px 10px; transition: border-color 0.2s, box-shadow 0.25s, transform 0.2s;
 }
-.relay::before {
-  content: ''; position: absolute; top: -70px; right: -70px; width: 200px; height: 200px;
-  background: radial-gradient(ellipse, rgba(var(--accent-rgb),0.16) 0%, transparent 70%);
-  opacity: 0; transition: opacity 0.25s; pointer-events: none;
-}
-.relay.on { border-top-color: var(--accent); box-shadow: 0 0 40px rgba(var(--accent-rgb),0.08); }
-.relay.on::before { opacity: 1; }
-.relay.on.src-artnet { border-top-color: var(--art); box-shadow: 0 0 40px rgba(var(--art-rgb),0.08); }
-.relay.on.src-artnet::before { background: radial-gradient(ellipse, rgba(var(--art-rgb),0.16) 0%, transparent 70%); }
-.relay.on.src-manual { border-top-color: var(--warn); box-shadow: 0 0 40px rgba(var(--warn-rgb),0.08); }
-.relay.on.src-manual::before { background: radial-gradient(ellipse, rgba(var(--warn-rgb),0.16) 0%, transparent 70%); }
-.manual-mode .relay { cursor: pointer; }
-.manual-mode .relay:hover { transform: translateY(-2px); border-color: var(--border-hi); }
-.manual-mode .relay:active { transform: translateY(0); }
-.relay-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.relay.on { border-top-color: var(--accent); box-shadow: 0 0 28px rgba(var(--accent-rgb),0.12); }
+.relay.on.src-artnet { border-top-color: var(--art); box-shadow: 0 0 28px rgba(var(--art-rgb),0.12); }
+.relay.on.src-manual { border-top-color: var(--warn); box-shadow: 0 0 28px rgba(var(--warn-rgb),0.12); }
+.manual-mode .relay:not(.locked) { cursor: pointer; }
+.manual-mode .relay:not(.locked):hover { transform: translateY(-2px); border-color: var(--border-hi); }
+.relay-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .relay-num {
-  font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--muted);
-  background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 1px 7px;
+  font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0 6px;
 }
-.relay-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
-.relay-state { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; color: var(--subtle); }
-.relay.on .relay-state { background: linear-gradient(135deg, #fff 20%, var(--accent) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-.relay.on.src-artnet .relay-state { background-image: linear-gradient(135deg, #fff 20%, var(--art) 100%); }
-.relay.on.src-manual .relay-state { background-image: linear-gradient(135deg, #fff 20%, var(--warn) 100%); }
-.relay-src { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); }
-.levels { display: flex; flex-direction: column; gap: 7px; }
-.level { display: grid; grid-template-columns: 30px 1fr 30px; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--subtle); }
-.level b { font-weight: 500; text-align: right; color: var(--muted); }
-.bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,0.06); position: relative; overflow: visible; }
-.bar i { position: absolute; inset: 0; border-radius: 4px; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 80ms linear; will-change: transform; }
-.level.art .bar i { background: var(--art); }
-.bar .thr { position: absolute; top: -3px; bottom: -3px; width: 1px; background: rgba(255,255,255,0.35); }
-.level.none { opacity: 0.45; }
+.relay-state { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: var(--subtle); }
+.relay.on .relay-state { color: var(--accent); }
+.relay.on.src-artnet .relay-state { color: var(--art); }
+.relay.on.src-manual .relay-state { color: var(--warn); }
+.relay-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.relay-src { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mbar { height: 4px; border-radius: 4px; background: rgba(255,255,255,0.06); position: relative; }
+.mbar i { position: absolute; inset: 0; border-radius: 4px; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 80ms linear; will-change: transform; }
+.mbar.art i { background: var(--art); }
+.mbar .thr { position: absolute; top: -3px; bottom: -3px; width: 1px; background: rgba(255,255,255,0.35); }
+
+/* ─── ANIMATRONIC ────────────────────────────────────────── */
+.anim-state { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 12px; position: relative; }
+.arrows { display: grid; grid-template-columns: 1fr 0.8fr 1fr; gap: 10px; flex: 1; position: relative; }
+.arrow {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 88px; border-radius: 14px; cursor: pointer; font-size: 14px; font-weight: 700;
+  background: var(--surface2); border: 1px solid var(--border-hi); color: var(--text);
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.2s, transform 0.1s; touch-action: manipulation;
+}
+.arrow:hover { border-color: rgba(var(--accent-rgb),0.5); }
+.arrow:active { transform: scale(0.97); }
+.arrow.active { background: var(--accent); border-color: var(--accent); color: #000; box-shadow: 0 0 40px rgba(var(--accent-rgb),0.3); }
+.arrow.pending { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.15); animation: pulse 1s infinite; }
+.arrow.blocked { opacity: 0.4; }
+.arrow.stop { color: var(--danger); border-color: rgba(var(--danger-rgb),0.35); background: rgba(var(--danger-rgb),0.06); }
+.arrow.stop:hover { background: rgba(var(--danger-rgb),0.12); }
+.arrow.flash { box-shadow: 0 0 0 4px rgba(255,255,255,0.25); }
+.anim-toggles { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 12px; position: relative; }
+.kbd {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 5px;
+  font-family: var(--mono); font-size: 11px; font-weight: 600; line-height: 1; color: var(--muted);
+  border: 1px solid var(--border-hi); border-bottom-width: 2px; border-radius: 5px; background: rgba(255,255,255,0.03);
+}
+.arrow.active .kbd { color: #000; border-color: rgba(0,0,0,0.3); }
+
+.sfx-list { display: flex; flex-direction: column; gap: 6px; position: relative; }
+.sfx-row { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 4px 6px; transition: border-color 0.15s, box-shadow 0.2s; }
+.sfx-row.playing { border-color: var(--accent); box-shadow: 0 0 24px rgba(var(--accent-rgb),0.15); }
+.sfx-play { width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--border-hi); background: var(--surface); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
+.sfx-play:hover:not(:disabled) { border-color: rgba(var(--accent-rgb),0.5); }
+.sfx-row.playing .sfx-play { background: var(--accent); color: #000; border-color: var(--accent); }
+.sfx-play:disabled { opacity: 0.35; cursor: default; }
+.sfx-info { min-width: 0; line-height: 1.35; }
+.sfx-name { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sfx-row.empty .sfx-name { color: var(--subtle); font-weight: 500; }
+.sfx-meta { font-family: var(--mono); font-size: 11px; color: var(--subtle); }
+.sfx-actions { display: flex; gap: 4px; }
+.icon-btn {
+  width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: hidden;
+  border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer;
+}
+.icon-btn:hover:not(:disabled) { color: var(--text); border-color: var(--border-hi); }
+.icon-btn:disabled, .icon-btn.disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+.icon-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.vol-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; position: relative; }
+.vol-row input[type=range] { height: 32px; }
+.vol-row .mono { min-width: 40px; text-align: right; font-size: 13px; }
+.sfx-foot { font-size: 12px; color: var(--subtle); position: relative; }
+
+/* ─── MAPPING PAGE ────────────────────────────────────────── */
+.hero.compact { margin-bottom: 24px; }
+.hero.compact h1 { font-size: clamp(26px, 3vw, 34px); margin-bottom: 6px; }
+.hero.compact .hero-sub { font-size: 15px; }
+.io-rows { display: flex; flex-direction: column; gap: 16px; position: relative; }
+.io-row { display: grid; grid-template-columns: 104px 1fr 1fr; gap: 12px; align-items: start; }
+.io-row > .switch { margin-top: 32px; }
+.art-switch input:checked + .track { background: var(--art); border-color: var(--art); box-shadow: 0 0 18px rgba(var(--art-rgb),0.3); }
+.card-note { font-size: 12px; color: var(--subtle); text-align: right; }
+.chan { display: flex; flex-direction: column; position: relative; }
+.chan-row {
+  display: grid; grid-template-columns: 36px 150px 1fr 34px minmax(200px, 280px); grid-template-areas: "num addr bar val sel";
+  gap: 14px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.chan-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.chan-row:first-child { padding-top: 0; }
+.chan-num { grid-area: num; font-family: var(--mono); font-size: 13px; font-weight: 700; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; text-align: center; padding: 2px 0; }
+.chan-addr { grid-area: addr; font-family: var(--mono); font-size: 11.5px; color: var(--subtle); white-space: nowrap; }
+.chan-row .mbar { grid-area: bar; }
+.chan-val { grid-area: val; font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--muted); text-align: right; }
+.chan-row select.input { grid-area: sel; min-height: 40px; padding: 8px 36px 8px 12px; font-size: 14px; }
+.chan-row.unused select.input { color: var(--subtle); }
+.fields.fields-3 { grid-template-columns: 1fr 1fr 1fr; }
+.motor-opts { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 18px; position: relative; }
+.names { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; position: relative; }
+.name-row { display: flex; align-items: center; gap: 10px; }
+.name-row .input { min-height: 40px; padding: 8px 12px; font-size: 14px; }
+.zones { position: relative; height: 26px; border-radius: 8px; overflow: hidden; display: flex; margin-top: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+.zones > div { display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; white-space: nowrap; }
+.zones .z-left, .zones .z-right { background: rgba(var(--accent-rgb),0.16); color: var(--accent); }
+.zones .z-stop { background: rgba(255,255,255,0.05); color: var(--subtle); }
+.zones .marker { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 8px #fff; transition: left 80ms linear; }
 
 /* ─── PARAM TABLE ─────────────────────────────────────────── */
 .params { display: flex; flex-direction: column; position: relative; }
@@ -341,8 +421,9 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
 
 /* ─── RESPONSIVE ──────────────────────────────────────────── */
 @media (max-width: 960px) {
-  .relays { grid-template-columns: repeat(2, 1fr); }
-  .grid-2 { grid-template-columns: 1fr; }
+  .grid-2, .status-grid { grid-template-columns: 1fr; }
+  .relays { grid-template-columns: repeat(4, 1fr); }
+  .chan-row { grid-template-columns: 36px 130px 1fr 34px minmax(160px, 230px); }
 }
 @media (max-width: 760px) {
   :root { --nav-h: 56px; --tabbar-h: 64px; }
@@ -361,13 +442,26 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
   .tab.active { color: var(--accent); }
   .tab.active::after { top: -1px; bottom: auto; left: 30%; right: 30%; }
   main { padding: calc(var(--nav-h) + 28px) 16px 48px; }
+  body[data-tab=status] main { padding: calc(var(--nav-h) + 12px) 12px 12px; }
   .hero { margin-bottom: 24px; }
   .hero-sub { font-size: 15px; }
   .card { padding: 18px; }
-  .relays { gap: 10px; }
-  .relay { padding: 14px; gap: 12px; }
-  .relay-state { font-size: 24px; }
-  .fields { grid-template-columns: 1fr; }
+  .status-sub { display: none; }
+  .status-bar { margin-bottom: 12px; }
+  .status-grid { gap: 12px; margin-bottom: 12px; }
+  .status-grid > .card, .relays-card { padding: 14px; }
+  .anim-state { font-size: 19px; margin-bottom: 10px; }
+  .arrow { min-height: 70px; }
+  .anim-toggles { margin-top: 12px; }
+  .relays { gap: 6px; }
+  .relay { padding: 8px; gap: 5px; }
+  .relay-src { display: none; }
+  .fields, .fields.fields-3 { grid-template-columns: 1fr; }
+  .io-row { grid-template-columns: 1fr 1fr; }
+  .io-row > .switch { grid-column: 1 / -1; margin-top: 0; }
+  .card-note { display: none; }
+  .chan-row { grid-template-columns: 32px 1fr auto; grid-template-areas: "num addr val" "num bar bar" "sel sel sel"; gap: 6px 12px; padding: 10px 0; }
+  .names { grid-template-columns: 1fr; }
   .map-row { grid-template-columns: 36px 1fr; }
   .map-row .input { grid-column: 2; }
   .map-row.head { display: none; }
@@ -377,7 +471,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
 }
 @media (max-width: 380px) {
   .brand-host { display: none; }
-  .relay-name { font-size: 13px; }
+  .relay-name { font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
@@ -409,10 +503,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
 
 <!-- ═══ STATUS ═══════════════════════════════════════════════ -->
 <section class="page" id="page-status">
-  <div class="hero">
-    <div class="section-tag">Live output</div>
-    <h1><span class="gradient-text">Relay status</span></h1>
-    <p class="hero-sub" id="statusSub">Loading…</p>
+  <div class="status-bar">
     <div class="badges">
       <span class="badge" id="bEth"><span class="dot"></span>Ethernet <span class="val"></span></span>
       <span class="badge" id="bWifi"><span class="dot"></span>Wi-Fi <span class="val"></span></span>
@@ -421,75 +512,129 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
       <span class="badge warn" id="bManual" hidden><span class="dot"></span>Manual override</span>
       <span class="badge bad" id="bExp" hidden><span class="dot"></span>Relay driver fault</span>
     </div>
+    <p class="status-sub" id="statusSub"></p>
   </div>
 
-  <div class="relays" id="relays"></div>
-
-  <div class="section-gap grid-2">
-    <div class="card" style="--accent-rgb: var(--warn-rgb)">
+  <div class="status-grid" id="statusGrid" hidden>
+    <div class="card" id="animCard">
       <div class="card-head">
-        <span class="card-title" style="color: var(--warn)">Manual override</span>
-        <label class="switch warn-switch"><input type="checkbox" id="manualToggle"><span class="track"></span></label>
+        <span class="card-title">Animatronic</span>
+        <span class="badge" id="animLimit"><span class="dot"></span>Limit <span class="val"></span></span>
       </div>
-      <p class="card-desc">Take the relays off DMX and Art-Net to test wiring. While on, tap a relay above to switch it. Turns off again when the device restarts.</p>
-      <div class="btn-row" id="manualBtns" hidden>
-        <button class="btn btn-secondary btn-sm" data-all="1">All on</button>
-        <button class="btn btn-secondary btn-sm" data-all="0">All off</button>
+      <div class="anim-state" id="animState">Stopped</div>
+      <div class="arrows">
+        <button class="arrow" type="button" data-motor="left"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 5l-7 7 7 7"/></svg>Left <span class="kbd">←</span></button>
+        <button class="arrow stop" type="button" data-motor="stop"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>Stop <span class="kbd">↓</span></button>
+        <button class="arrow" type="button" data-motor="right"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>Right <span class="kbd">→</span></button>
+      </div>
+      <div class="anim-toggles">
+        <label class="switch"><input type="checkbox" id="eyesToggle"><span class="track"></span>Eyes <span class="kbd">↑</span></label>
+        <label class="switch warn-switch"><input type="checkbox" id="overrideToggle"><span class="track"></span>Override limit switch</label>
       </div>
     </div>
-    <div class="card">
-      <div class="card-head"><span class="card-title">Inputs</span></div>
-      <div class="params" id="inputParams"></div>
+
+    <div class="card" id="sfxCard">
+      <div class="card-head">
+        <span class="card-title">Sound effects</span>
+        <span class="badge" id="usbBadge"><span class="dot"></span>USB speaker <span class="val"></span></span>
+      </div>
+      <div class="sfx-list" id="sfxList"></div>
+      <div class="vol-row"><span class="label">Volume</span><input id="volume" type="range" min="0" max="100" aria-label="Volume"><span class="mono" id="volVal"></span></div>
+      <p class="sfx-foot" id="sfxStorage"></p>
     </div>
+  </div>
+
+  <div class="card relays-card">
+    <div class="card-head">
+      <span class="card-title">Relays</span>
+      <div class="head-tools">
+        <div class="btn-row" id="manualBtns" hidden>
+          <button class="btn btn-secondary btn-sm" data-all="1">All on</button>
+          <button class="btn btn-secondary btn-sm" data-all="0">All off</button>
+        </div>
+        <label class="switch warn-switch" title="Take the relays off DMX and Art-Net to test wiring, then tap a relay to switch it. Turns off again when the device restarts."><input type="checkbox" id="manualToggle"><span class="track"></span>Manual override</label>
+      </div>
+    </div>
+    <div class="relays" id="relays"></div>
   </div>
 </section>
 
 <!-- ═══ MAPPING ══════════════════════════════════════════════ -->
 <section class="page" id="page-mapping">
-  <div class="hero">
-    <div class="section-tag">Patch</div>
-    <h1><span class="gradient-text">Inputs &amp; mapping</span></h1>
-    <p class="hero-sub">Each input listens to an 8-channel range. A relay closes when its channel is at or above the threshold. Changes apply immediately when saved.</p>
+  <div class="hero compact">
+    <h1><span class="gradient-text">Mapping</span></h1>
+    <p class="hero-sub" id="mapSub">DMX and Art-Net feed the same 8 channels. Changes apply when saved.</p>
   </div>
 
   <div class="grid-2">
     <div class="card">
-      <div class="card-head">
-        <span class="card-title">DMX input · RS485</span>
-        <label class="switch"><input type="checkbox" id="dmxEnabled" data-dirty><span class="track"></span></label>
-      </div>
-      <div class="fields">
-        <div class="field full">
-          <label for="dmxStart">Start address</label>
-          <input class="input mono" id="dmxStart" type="number" inputmode="numeric" min="1" max="505" data-dirty>
-          <span class="hint">1–505</span>
+      <div class="card-head"><span class="card-title">Inputs</span></div>
+      <div class="io-rows">
+        <div class="io-row">
+          <label class="switch"><input type="checkbox" id="dmxEnabled" data-dirty><span class="track"></span>DMX</label>
+          <div class="field">
+            <label for="dmxStart">Start address</label>
+            <input class="input mono" id="dmxStart" type="number" inputmode="numeric" min="1" max="505" data-dirty>
+            <span class="hint" id="dmxRange"></span>
+          </div>
+        </div>
+        <div class="io-row">
+          <label class="switch art-switch"><input type="checkbox" id="artEnabled" data-dirty><span class="track"></span>Art-Net</label>
+          <div class="field">
+            <label for="artUniverse">Universe</label>
+            <input class="input mono" id="artUniverse" type="number" inputmode="numeric" min="0" max="32767" data-dirty>
+            <span class="hint" id="artNsu"></span>
+          </div>
+          <div class="field">
+            <label for="artStart">Start channel</label>
+            <input class="input mono" id="artStart" type="number" inputmode="numeric" min="1" max="505" data-dirty>
+            <span class="hint" id="artRange"></span>
+          </div>
         </div>
       </div>
-      <div class="chip-row"><span class="chip"><span class="dot"></span><span id="dmxRange">—</span></span></div>
     </div>
 
-    <div class="card art">
-      <div class="card-head">
-        <span class="card-title">Art-Net input · UDP 6454</span>
-        <label class="switch"><input type="checkbox" id="artEnabled" data-dirty><span class="track"></span></label>
-      </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Behaviour</span></div>
       <div class="fields">
         <div class="field">
-          <label for="artUniverse">Universe</label>
-          <input class="input mono" id="artUniverse" type="number" inputmode="numeric" min="0" max="32767" data-dirty>
-          <span class="hint" id="artNsu">Net 0 · Sub-Net 0 · Universe 0</span>
+          <label for="threshold">Switch-on threshold</label>
+          <div class="row" style="align-items:center; gap:12px">
+            <input id="threshold" type="range" min="1" max="255" data-dirty>
+            <input class="input mono" id="thresholdNum" type="number" inputmode="numeric" min="1" max="255" style="max-width:80px; flex:none" data-dirty>
+          </div>
+          <span class="hint" id="thresholdHint"></span>
         </div>
         <div class="field">
-          <label for="artStart">Start channel</label>
-          <input class="input mono" id="artStart" type="number" inputmode="numeric" min="1" max="505" data-dirty>
-          <span class="hint">1–505</span>
+          <label for="merge">When both inputs are live</label>
+          <select class="input" id="merge" data-dirty>
+            <option value="htp">Highest value wins (HTP)</option>
+            <option value="ltp">Most recent input wins (LTP)</option>
+            <option value="dmx">Prefer DMX</option>
+            <option value="artnet">Prefer Art-Net</option>
+          </select>
+        </div>
+        <div class="field">
+          <span class="label">On signal loss</span>
+          <div class="seg" id="loss">
+            <button type="button" data-v="hold">Hold last state</button>
+            <button type="button" data-v="off">All off</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="lossTimeout">Signal-loss timeout (s)</label>
+          <input class="input mono" id="lossTimeout" type="number" inputmode="decimal" min="1" max="60" step="0.5" data-dirty>
         </div>
       </div>
-      <div class="chip-row"><span class="chip"><span class="dot"></span><span id="artRange">—</span></span></div>
     </div>
   </div>
 
-  <div class="card section-gap">
+  <div class="card section-gap" id="chanCard" hidden>
+    <div class="card-head"><span class="card-title">Channels</span><span class="card-note">One output per channel · choosing an output that's in use moves it here</span></div>
+    <div class="chan" id="chanTable"></div>
+  </div>
+
+  <div class="card section-gap" id="relayMapCard">
     <div class="card-head"><span class="card-title">Relay assignment</span></div>
     <p class="card-desc">Choose which channel of the range drives each relay. DMX and Art-Net use the same assignment.</p>
     <div class="map" id="map">
@@ -497,37 +642,58 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
     </div>
   </div>
 
-  <div class="card section-gap">
-    <div class="card-head"><span class="card-title">Behaviour</span></div>
-    <div class="fields">
-      <div class="field">
-        <label for="threshold">Switch-on threshold</label>
-        <div class="row" style="align-items:center; gap:14px">
-          <input id="threshold" type="range" min="1" max="255" data-dirty>
-          <input class="input mono" id="thresholdNum" type="number" inputmode="numeric" min="1" max="255" style="max-width:90px; flex:none" data-dirty>
-        </div>
-        <span class="hint" id="thresholdHint"></span>
-      </div>
-      <div class="field">
-        <label for="merge">When DMX and Art-Net are both live</label>
-        <select class="input" id="merge" data-dirty>
-          <option value="htp">Highest value wins (HTP)</option>
-          <option value="ltp">Most recent input wins (LTP)</option>
-          <option value="dmx">Prefer DMX</option>
-          <option value="artnet">Prefer Art-Net</option>
-        </select>
-      </div>
-      <div class="field">
-        <span class="label">On signal loss</span>
-        <div class="seg" id="loss">
-          <button type="button" data-v="hold">Hold last state</button>
-          <button type="button" data-v="off">All relays off</button>
+  <div class="grid-2 section-gap" id="animCards" hidden>
+    <div class="card" id="motorCard">
+      <div class="card-head">
+        <span class="card-title">Motor</span>
+        <div class="seg" id="motorMode">
+          <button type="button" data-v="dual">Left + right channels</button>
+          <button type="button" data-v="single">Direction channel</button>
         </div>
       </div>
-      <div class="field">
-        <label for="lossTimeout">Signal-loss timeout (seconds)</label>
-        <input class="input mono" id="lossTimeout" type="number" inputmode="decimal" min="1" max="60" step="0.5" data-dirty>
+      <div id="dirFields" hidden style="margin-bottom:16px">
+        <div class="fields">
+          <div class="field">
+            <label for="dirCenter">Center (stop)</label>
+            <input class="input mono" id="dirCenter" type="number" inputmode="numeric" min="1" max="254" data-dirty>
+          </div>
+          <div class="field">
+            <label for="deadZone">Dead zone (±)</label>
+            <input class="input mono" id="deadZone" type="number" inputmode="numeric" min="0" max="127" data-dirty>
+          </div>
+          <div class="field full">
+            <div class="zones" id="zones"><div class="z-left">LEFT</div><div class="z-stop">STOP</div><div class="z-right">RIGHT</div><span class="marker" hidden></span></div>
+            <span class="hint" id="zonesHint"></span>
+          </div>
+        </div>
       </div>
+      <div class="fields fields-3">
+        <div class="field">
+          <label for="reverseDelay">Reverse delay (ms)</label>
+          <input class="input mono" id="reverseDelay" type="number" inputmode="numeric" min="0" max="10000" step="50" data-dirty title="Both relays off this long before the motor changes direction">
+        </div>
+        <div class="field">
+          <label for="limitIgnore">Ignore limit (ms)</label>
+          <input class="input mono" id="limitIgnore" type="number" inputmode="numeric" min="0" max="10000" step="50" data-dirty title="Limit hits are ignored this long after starting, so the motor can drive off the switch it stopped on">
+        </div>
+        <div class="field">
+          <label for="maxRun">Max run (s)</label>
+          <input class="input mono" id="maxRun" type="number" inputmode="numeric" min="0" max="3600" data-dirty title="Safety stop if no limit is reached. 0 = off">
+        </div>
+      </div>
+      <div class="motor-opts">
+        <div class="seg" id="limitType" title="Limit switch on DI1 / DGND">
+          <button type="button" data-v="no">Switch normally open</button>
+          <button type="button" data-v="nc">Normally closed</button>
+        </div>
+        <label class="switch"><input type="checkbox" id="animSwap" data-dirty><span class="track"></span>Swap left / right</label>
+      </div>
+    </div>
+
+    <div class="card" id="namesCard">
+      <div class="card-head"><span class="card-title">Relay names</span></div>
+      <p class="card-desc">Relays 1–3 are the motor and eyes.</p>
+      <div class="names" id="relayNames"></div>
     </div>
   </div>
 </section>
@@ -621,9 +787,22 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
   </div>
 
   <div class="grid-2">
-    <div class="card">
-      <div class="card-head"><span class="card-title">About</span></div>
-      <div class="params" id="sysParams"></div>
+    <div class="stack">
+      <div class="card">
+        <div class="card-head"><span class="card-title">About</span></div>
+        <div class="params" id="sysParams"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Inputs</span></div>
+        <div class="params" id="inputParams"></div>
+      </div>
+      <div class="card" id="usbCard" hidden>
+        <div class="card-head">
+          <span class="card-title">USB audio</span>
+          <label class="switch"><input type="checkbox" id="usbAudio"><span class="track"></span></label>
+        </div>
+        <p class="card-desc" style="margin:0">Plays sound effects through a USB speaker on the USB-C port. While on, that port can't be used for the serial monitor. Changing this restarts the device.</p>
+      </div>
     </div>
     <div class="stack">
       <div class="card art">
@@ -683,6 +862,7 @@ function toast(msg, err) {
 function showTab(name) {
   if (!$('#page-' + name)) name = 'status';
   $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+  document.body.dataset.tab = name;
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   $('#savebar').classList.toggle('show', dirty && name === 'mapping');
   if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
@@ -729,13 +909,10 @@ function buildRelays() {
   for (let i = 0; i < 8; i++) {
     const el = document.createElement('div');
     el.className = 'relay';
-    el.dataset.i = i;
-    el.innerHTML = `<div class="relay-top"><span class="relay-num">${String(i + 1).padStart(2, '0')}</span><span class="relay-name"></span></div>
-      <div><div class="relay-state">OFF</div><div class="relay-src">&nbsp;</div></div>
-      <div class="levels"><div class="level dmx"><span>DMX</span><span class="bar"><i></i><span class="thr"></span></span><b>—</b></div>
-      <div class="level art"><span>ART</span><span class="bar"><i></i><span class="thr"></span></span><b>—</b></div></div>`;
+    el.innerHTML = `<div class="relay-top"><span class="relay-num">${String(i + 1).padStart(2, '0')}</span><span class="relay-state">OFF</span></div>
+      <div class="relay-name"></div><div class="mbar"><i></i><span class="thr"></span></div><div class="relay-src">&nbsp;</div>`;
     el.addEventListener('click', () => {
-      if (!st || !st.manual) return;
+      if (!st || !st.manual || (st.anim && i < 3)) return;  // animatronic relays use their own controls
       const on = !st.relays[i].on;
       st.relays[i].on = on;
       renderStatus();
@@ -745,7 +922,7 @@ function buildRelays() {
   }
 }
 
-const SRC_LABEL = { dmx: 'via DMX', artnet: 'via Art-Net', manual: 'manual', hold: 'holding · no signal' };
+const SRC_LABEL = { dmx: 'DMX', artnet: 'Art-Net', manual: 'manual', hold: 'holding', anim: 'animatronic' };
 
 function renderLive() {
   if (!st) return;
@@ -759,44 +936,88 @@ function renderLive() {
 
   const thr = c ? c.relays.threshold : 128;
   $$('.relay').forEach((el, i) => {
-    const r = st.relays[i];
-    el.className = 'relay' + (r.on ? ' on' : '') + (r.src ? ' src-' + r.src : '');
-    $('.relay-name', el).textContent = c ? c.relays.names[i] : 'Relay ' + (i + 1);
+    const r = st.relays[i], locked = st.anim && i < 3;
+    el.className = 'relay' + (r.on ? ' on' : '') + (r.src ? ' src-' + r.src : '') + (locked ? ' locked' : '');
+    $('.relay-name', el).textContent = locked ? animRelayName(i) : c ? c.relays.names[i] : 'Relay ' + (i + 1);
     $('.relay-state', el).textContent = r.on ? 'ON' : 'OFF';
+    const useArt = r.src === 'artnet' || r.dmx === undefined, v = useArt ? r.art : r.dmx;
+    const bar = $('.mbar', el);
+    bar.classList.toggle('art', useArt);
+    $('i', bar).style.transform = `scaleX(${v === undefined ? 0 : v / 255})`;
+    $('.thr', bar).style.left = (thr / 2.55) + '%';
     const slot = c ? c.relays.map[i] : 0;
-    $('.relay-src', el).textContent = slot === 0 && !st.manual ? 'unassigned' : (SRC_LABEL[r.src] || '\u00a0');
-    for (const [k, cls] of [['dmx', '.level.dmx'], ['art', '.level.art']]) {
-      const lv = $(cls, el), v = r[k];
-      lv.classList.toggle('none', v === undefined);
-      $('i', lv).style.transform = `scaleX(${v === undefined ? 0 : v / 255})`;
-      $('.thr', lv).style.left = (thr / 2.55) + '%';
-      $('b', lv).textContent = v === undefined ? '—' : v;
-    }
+    const label = slot === 0 && !st.manual && !locked ? 'unassigned' : (SRC_LABEL[r.src] || '');
+    $('.relay-src', el).textContent = (label + (v !== undefined && r.src !== 'manual' ? ' · ' + v : '')) || ' ';
   });
+  renderAnim();
+  renderSfx();
+  if ($('#page-mapping').classList.contains('active')) renderChanLevels();
 }
+
+// Relays 1-3 are the motor and eyes in the animatronic build.
+function animRelayName(i) {
+  const swap = cfg && cfg.anim.swap;
+  return [swap ? 'Motor right' : 'Motor left', swap ? 'Motor left' : 'Motor right', 'Eyes'][i];
+}
+
+function renderAnim() {
+  const a = st.anim;
+  if (!a) return;
+  let text;
+  if (a.dir !== 'stop') text = 'Moving ' + a.dir;
+  else if (a.target !== 'stop') text = 'Reversing → ' + a.target;
+  else if (a.reason === 'limit') text = `Stopped at ${a.atLimit} limit`;
+  else if (a.reason === 'timeout') text = 'Stopped · max run time';
+  else text = 'Stopped';
+  $('#animState').textContent = text;
+  $$('.arrow[data-motor]').forEach(b => {
+    const d = b.dataset.motor;
+    if (d === 'stop') return;
+    b.classList.toggle('active', a.dir === d);
+    b.classList.toggle('pending', a.dir !== d && a.target === d);
+    b.classList.toggle('blocked', a.atLimit === d && !a.override);
+  });
+  setBadge($('#animLimit'), a.override ? 'warn' : a.limit ? 'live' : '',
+    (a.override ? 'overridden' : a.limit ? 'hit' : 'clear') + ' · contact ' + (a.closed ? 'closed' : 'open'));
+  $('#eyesToggle').checked = a.eyes;
+  $('#overrideToggle').checked = a.override;
+}
+
+let sfxNamesSig = null;
 
 function renderStatus() {
   if (!st) return;
   const c = cfg;
+  const animBuild = st.variant === 'animatronic';
+  $('#statusGrid').hidden = !animBuild;
   renderLive();
   $('#navHost').textContent = st.hostname + '.local';
   $('#footFw').textContent = 'v' + st.fw;
-  document.title = st.hostname + ' · DMX Relay';
+  document.title = st.hostname + (animBuild ? ' · Animatronic' : ' · DMX Relay');
+  $('.brand-name').textContent = animBuild ? 'Animatronic' : 'DMX Relay';
+  $$('#chanCard, #animCards').forEach(el => el.hidden = !animBuild);
+  $('#relayMapCard').hidden = animBuild;
+  $('#usbCard').hidden = !st.sfx;
+  // Sound names appear in the channel menus; rebuild them only when they change.
+  const sig = st.sfx ? st.sfx.slots.map(x => x.loaded ? x.name : '').join('|') : '';
+  if (sig !== sfxNamesSig) {
+    sfxNamesSig = sig;
+    renderChan();
+  }
 
   setBadge($('#bEth'), st.eth.connected ? 'live' : st.eth.link ? 'warn' : '', st.eth.connected ? st.eth.ip : st.eth.link ? 'no IP' : 'unplugged');
   setBadge($('#bWifi'), st.wifi.connected ? 'live' : st.wifi.enabled ? 'warn' : '', st.wifi.connected ? st.wifi.ip : st.wifi.enabled ? 'connecting' : 'off');
   $('#bExp').hidden = st.expander;
 
   if (c) {
-    const dr = `${pad3(c.dmx.start)}–${pad3(c.dmx.start + 7)}`, ar = `${pad3(c.artnet.start)}–${pad3(c.artnet.start + 7)}`;
     const sub = $('#statusSub');
     sub.replaceChildren();
-    const m = (t) => { const s = document.createElement('span'); s.className = 'mono'; s.textContent = t; return s; };
-    if (c.dmx.enabled) sub.append('DMX ', m(dr));
-    if (c.dmx.enabled && c.artnet.enabled) sub.append(' and ');
-    if (c.artnet.enabled) sub.append('Art-Net universe ', m(String(c.artnet.universe)), ' channels ', m(ar));
-    if (!c.dmx.enabled && !c.artnet.enabled) sub.append('Both inputs are disabled.');
-    else sub.append(' drive eight relays, on at ', m('≥ ' + c.relays.threshold), '.');
+    const m = t => { const el = document.createElement('span'); el.className = 'mono'; el.textContent = t; return el; };
+    if (c.dmx.enabled) sub.append('DMX ', m(`${pad3(c.dmx.start)}–${pad3(c.dmx.start + 7)}`));
+    if (c.dmx.enabled && c.artnet.enabled) sub.append(' · ');
+    if (c.artnet.enabled) sub.append('Art-Net ', m(`U${c.artnet.universe} ${pad3(c.artnet.start)}–${pad3(c.artnet.start + 7)}`));
+    if (!c.dmx.enabled && !c.artnet.enabled) sub.append('Both inputs are disabled');
+    else sub.append(' · on at ', m('≥ ' + c.relays.threshold));
   }
 
   params($('#inputParams'), [
@@ -809,7 +1030,7 @@ function renderStatus() {
 
   renderNetStatus();
   params($('#sysParams'), [
-    ['Firmware', 'v' + st.fw],
+    ['Firmware', `v${st.fw} · ${st.variant || 'dmx-relay'}`],
     ['Uptime', uptime(st.uptime)],
     ['Free memory', Math.round(st.heap / 1024) + ' KB'],
     ['Relay driver', st.expander ? 'TCA9554 OK' : 'not responding'],
@@ -817,6 +1038,205 @@ function renderStatus() {
     ['Wi-Fi MAC', st.wifi.mac],
   ]);
 }
+
+$$('.arrow[data-motor]').forEach(b => b.addEventListener('click', () => {
+  api('/api/anim', { motor: b.dataset.motor }).catch(err => toast(err.message, true));
+}));
+$('#eyesToggle').addEventListener('change', e => {
+  api('/api/anim', { eyes: e.target.checked }).catch(err => toast(err.message, true));
+});
+$('#overrideToggle').addEventListener('change', e => {
+  api('/api/anim', { override: e.target.checked }).catch(err => toast(err.message, true));
+});
+
+// ─── SOUND EFFECTS ─────────────────────────────────────────
+const SFX_RATE = 24000;
+const sfxBusy = [];      // per-slot upload progress text
+let volDragging = false;
+
+const UPLOAD_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>';
+const DELETE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+function buildSfx() {
+  const wrap = $('#sfxList');
+  for (let i = 0; i < 4; i++) {
+    const row = document.createElement('div');
+    row.className = 'sfx-row empty';
+    row.innerHTML = `<button class="sfx-play" type="button" aria-label="Play sound ${i + 1}"></button>
+      <div class="sfx-info"><div class="sfx-name"></div><div class="sfx-meta"></div></div>
+      <div class="sfx-actions">
+        <label class="icon-btn sfx-up" title="Upload a sound (WAV, MP3, …) — converted to mono 24 kHz">${UPLOAD_ICON}<input type="file" accept="audio/*,.wav,.mp3" aria-label="Upload sound ${i + 1}"></label>
+        <button class="icon-btn sfx-del" type="button" title="Delete" aria-label="Delete sound ${i + 1}">${DELETE_ICON}</button>
+      </div>`;
+    $('.sfx-play', row).addEventListener('click', () => {
+      const playing = st.sfx.playing >> i & 1;
+      api('/api/sfx', playing ? { stop: i } : { play: i }).catch(e => toast(e.message, true));
+    });
+    $('input[type=file]', row).addEventListener('change', e => {
+      const f = e.target.files[0];
+      e.target.value = '';
+      if (f) uploadSound(i, f);
+    });
+    $('.sfx-del', row).addEventListener('click', () => {
+      if (!confirm(`Delete "${sfxName(i)}"?`)) return;
+      api('/api/sfx', { delete: i }).then(poll).catch(e => toast(e.message, true));
+    });
+    wrap.append(row);
+  }
+}
+
+const PLAY_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const STOP_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>';
+
+function renderSfx() {
+  const s = st.sfx;
+  $('#sfxCard').hidden = !s;
+  if (!s) return;
+  const usb = { connected: ['live', s.device], waiting: ['warn', 'not connected'], unsupported: ['bad', 'unsupported'], off: ['', 'off'] }[s.usb] || ['', s.usb];
+  setBadge($('#usbBadge'), usb[0], usb[1]);
+  $$('.sfx-row').forEach((row, i) => {
+    const slot = s.slots[i], playing = !!(s.playing >> i & 1), busy = sfxBusy[i];
+    row.classList.toggle('playing', playing);
+    row.classList.toggle('empty', !slot.loaded);
+    const btn = $('.sfx-play', row);
+    const icon = playing ? STOP_ICON : PLAY_ICON;
+    if (btn.innerHTML !== icon) btn.innerHTML = icon;
+    btn.disabled = !slot.loaded || !!busy;
+    $('.sfx-name', row).textContent = slot.loaded ? sfxName(i) : 'Empty';
+    $('.sfx-meta', row).textContent = busy || `Sound ${i + 1}` + (slot.loaded ? ` · ${slot.seconds.toFixed(1)} s` : '');
+    $('.sfx-del', row).disabled = !slot.loaded || !!busy;
+    $('.sfx-up', row).classList.toggle('disabled', !!busy);
+  });
+  const vol = $('#volume');
+  if (!volDragging) vol.value = s.volume;
+  vol.disabled = s.volumeFromInput;
+  vol.style.setProperty('--p', vol.value + '%');
+  $('#volVal').textContent = vol.value + '%';
+  const free = Math.max(0, s.fsTotal - s.fsUsed);
+  $('#sfxStorage').textContent = (s.volumeFromInput ? 'Volume set by its channel · ' : '') +
+    `${Math.round(s.fsUsed / 1024)} of ${Math.round(s.fsTotal / 1024)} KB used · room for ~${Math.floor(free / (SFX_RATE * 2))} s more`;
+  if (cfg) $('#usbAudio').checked = cfg.sfx.usbAudio;
+}
+
+// Decodes any audio file the browser understands and re-encodes it as a mono
+// 16-bit WAV at SFX_RATE, so the device only ever deals with one format.
+async function encodeSound(file) {
+  const data = await file.arrayBuffer();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  let audio;
+  try {
+    audio = await new Promise((res, rej) => ctx.decodeAudioData(data, res, rej));
+  } catch (e) {
+    throw new Error("Couldn't read that audio file");
+  } finally {
+    if (ctx.close) ctx.close();
+  }
+  const frames = Math.ceil(audio.duration * SFX_RATE);
+  const off = new OfflineAudioContext(1, frames, SFX_RATE);
+  const src = off.createBufferSource();
+  src.buffer = audio;
+  src.connect(off.destination);
+  src.start();
+  const pcm = (await off.startRendering()).getChannelData(0);
+  const v = new DataView(new ArrayBuffer(44 + frames * 2));
+  const str = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); v.setUint32(4, 36 + frames * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, SFX_RATE, true); v.setUint32(28, SFX_RATE * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, frames * 2, true);
+  for (let i = 0; i < frames; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, pcm[i])) * 32767, true);
+  return new Blob([v.buffer], { type: 'audio/wav' });
+}
+
+async function uploadSound(i, file) {
+  sfxBusy[i] = 'Converting…';
+  renderSfx();
+  try {
+    const wav = await encodeSound(file);
+    const s = st.sfx, slot = s.slots[i];
+    const free = s.fsTotal - s.fsUsed + (slot.loaded ? slot.seconds * SFX_RATE * 2 : 0);
+    if (wav.size > free * 0.95) throw new Error(`Too long: ${(wav.size / SFX_RATE / 2).toFixed(1)} s, about ${Math.floor(free / SFX_RATE / 2)} s of space left`);
+    const name = file.name.replace(/\.[^.]+$/, '').slice(0, 32);
+    await new Promise((res, rej) => {
+      const fd = new FormData();
+      fd.append('file', wav, 'sound.wav');
+      const xhr = new XMLHttpRequest();
+      xhr.upload.onprogress = e => {
+        if (!e.lengthComputable) return;
+        sfxBusy[i] = `Uploading ${Math.round(e.loaded / e.total * 100)}%`;
+        renderSfx();
+      };
+      xhr.onload = () => {
+        let j = {};
+        try { j = JSON.parse(xhr.responseText); } catch (e) { /* ignore */ }
+        if (xhr.status === 200 && j.ok) res();
+        else rej(new Error(j.error || `HTTP ${xhr.status}`));
+      };
+      xhr.onerror = () => rej(new Error('Upload failed'));
+      xhr.open('POST', `/api/sfx/upload?slot=${i + 1}&name=${encodeURIComponent(name)}`);
+      xhr.send(fd);
+    });
+    toast(`Sound ${i + 1}: ${name} uploaded`);
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    sfxBusy[i] = null;
+    poll();
+  }
+}
+
+$('#volume').addEventListener('input', e => {
+  volDragging = true;
+  e.target.style.setProperty('--p', e.target.value + '%');
+  $('#volVal').textContent = e.target.value + '%';
+});
+$('#volume').addEventListener('change', async e => {
+  try {
+    const r = await api('/api/config', { sfx: { volume: +e.target.value } });
+    cfg = r.config;
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    volDragging = false;
+  }
+});
+$('#usbAudio').addEventListener('change', async e => {
+  const on = e.target.checked;
+  if (!confirm(`${on ? 'Turn on' : 'Turn off'} USB audio and restart the device?`)) {
+    e.target.checked = !on;
+    return;
+  }
+  try {
+    const r = await api('/api/config', { sfx: { usbAudio: on } });
+    cfg = r.config;
+    if (r.reboot) rebootOverlay('Restarting', candidates());
+  } catch (err) {
+    e.target.checked = !on;
+    toast(err.message, true);
+  }
+});
+
+// Keyboard: ← left, → right, ↓ stop, ↑ eyes on/off. Status page only, and never while typing.
+document.addEventListener('keydown', e => {
+  if (!st || !st.anim || !$('#page-status').classList.contains('active')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.target.closest('input, select, textarea')) return;
+  const motor = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'stop' }[e.key];
+  if (!motor && e.key !== 'ArrowUp') return;
+  e.preventDefault();
+  if (e.repeat) return;
+  if (motor) {
+    const b = $(`.arrow[data-motor="${motor}"]`);
+    b.classList.add('flash');
+    setTimeout(() => b.classList.remove('flash'), 150);
+    api('/api/anim', { motor }).catch(err => toast(err.message, true));
+  } else {
+    const eyes = !st.anim.eyes;
+    st.anim.eyes = eyes;
+    renderAnim();
+    api('/api/anim', { eyes }).catch(err => toast(err.message, true));
+  }
+});
 
 $('#manualToggle').addEventListener('change', e => {
   api('/api/relays', { manual: e.target.checked }).then(poll).catch(err => toast(err.message, true));
@@ -845,7 +1265,8 @@ async function poll() {
 // The device pushes changes over Server-Sent Events: relay flips immediately,
 // levels at up to ~30/s, full status once a second. Polling only covers gaps
 // (stream not up yet, device restarting, or a browser without EventSource).
-const SRC = [undefined, 'dmx', 'artnet', 'manual', 'hold'];
+const SRC = [undefined, 'dmx', 'artnet', 'manual', 'hold', 'anim'];
+const DIRS = ['stop', 'left', 'right'], REASONS = [undefined, 'user', 'limit', 'timeout', 'input'];
 let events = null, lastEvent = 0, liveFrame = 0;
 
 function applyLive(l) {
@@ -858,6 +1279,12 @@ function applyLive(l) {
     art: l.a[i] >= 0 ? l.a[i] : undefined,
     src: SRC[l.s[i]],
   }));
+  if (l.id) st.inputs = { dmx: l.id, art: l.ia };
+  if (l.sx && st.sfx) [st.sfx.playing, st.sfx.volume, st.sfx.volumeFromInput] = l.sx;
+  if (l.an) {
+    const [dir, target, atLimit, reason, limit, closed, override, eyes] = l.an;
+    st.anim = { dir: DIRS[dir], target: DIRS[target], atLimit: DIRS[atLimit], reason: REASONS[reason], limit, closed, override, eyes };
+  }
 }
 
 function openEvents() {
@@ -900,6 +1327,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ─── MAPPING PAGE ──────────────────────────────────────────
+// DMX build: each relay picks a channel.
 function buildMap() {
   const wrap = $('#map');
   for (let i = 0; i < 8; i++) {
@@ -912,11 +1340,159 @@ function buildMap() {
   }
 }
 
+// Animatronic build: each of the 8 channels drives at most one output.
+let chan = Array(8).fill('');
+const slotOf = key => chan.indexOf(key) + 1;
+// Direction and volume use the channel's whole range; everything else switches at the threshold.
+const usesThreshold = key => key && key !== 'dir' && key !== 'vol';
+
+function sfxName(i) {
+  const slot = st && st.sfx && st.sfx.slots[i];
+  return slot && slot.loaded && slot.name ? slot.name : `Sound ${i + 1}`;
+}
+
+function relayName(i) {
+  const el = $(`[data-rname="${i}"]`);
+  return (el && el.value.trim()) || (cfg && cfg.relays.names[i]) || `Relay ${i + 1}`;
+}
+
+function outputGroups() {
+  const motor = segValue($('#motorMode')) === 'single'
+    ? [['dir', 'Motor direction']]
+    : [['left', 'Motor left'], ['right', 'Motor right']];
+  return [
+    ['Animatronic', [...motor, ['eyes', 'Eyes / lights']]],
+    ['Sound', [...[0, 1, 2, 3].map(i => ['sfx' + i, '♪ ' + sfxName(i)]), ['vol', 'Volume']]],
+    ['Relays', [3, 4, 5, 6, 7].map(i => {
+      const name = relayName(i), plain = `Relay ${i + 1}`;
+      return ['relay' + i, name === plain ? plain : `${plain} · ${name}`];
+    })],
+  ];
+}
+
+function buildChan() {
+  const wrap = $('#chanTable');
+  for (let i = 0; i < 8; i++) {
+    const row = document.createElement('div');
+    row.className = 'chan-row';
+    row.innerHTML = `<span class="chan-num">${i + 1}</span><span class="chan-addr"></span>
+      <span class="mbar"><i></i><span class="thr"></span></span><b class="chan-val">—</b>
+      <select class="input" data-chan="${i}" data-dirty aria-label="Channel ${i + 1} output"></select>`;
+    $('select', row).addEventListener('change', e => {
+      const key = e.target.value, other = chan.indexOf(key);
+      if (key && other >= 0 && other !== i) chan[other] = '';  // an output lives on one channel: move it here
+      chan[i] = key;
+      renderChan();
+    });
+    wrap.append(row);
+  }
+  const names = $('#relayNames');
+  for (let i = 3; i < 8; i++) {
+    const row = document.createElement('div');
+    row.className = 'name-row';
+    row.innerHTML = `<span class="relay-num">${String(i + 1).padStart(2, '0')}</span>
+      <input class="input" data-rname="${i}" maxlength="24" data-dirty aria-label="Relay ${i + 1} name">`;
+    names.append(row);
+  }
+}
+
+// Settings saved before mapping was exclusive may share a channel; the first output listed wins.
+function chanFromConfig() {
+  chan = Array(8).fill('');
+  const put = (slot, key) => { if (slot >= 1 && slot <= 8 && !chan[slot - 1]) chan[slot - 1] = key; };
+  if (cfg.anim.motorMode === 'single') put(cfg.anim.dirChannel, 'dir');
+  else { put(cfg.anim.map[0], 'left'); put(cfg.anim.map[1], 'right'); }
+  put(cfg.anim.map[2], 'eyes');
+  cfg.sfx.map.forEach((slot, i) => put(slot, 'sfx' + i));
+  put(cfg.sfx.volChannel, 'vol');
+  for (let i = 3; i < 8; i++) put(cfg.relays.map[i], 'relay' + i);
+}
+
+function renderChan() {
+  const ds = clampInt($('#dmxStart').value, 1, 505, 1), as = clampInt($('#artStart').value, 1, 505, 1);
+  const groups = outputGroups();
+  $$('.chan-row').forEach((row, i) => {
+    $('.chan-addr', row).textContent = `DMX ${pad3(ds + i)} · ART ${pad3(as + i)}`;
+    const sel = $('select', row);
+    sel.replaceChildren(new Option('— nothing —', ''));
+    for (const [label, items] of groups) {
+      const group = document.createElement('optgroup');
+      group.label = label;
+      for (const [key, text] of items) {
+        const at = chan.indexOf(key);
+        group.append(new Option(at >= 0 && at !== i ? `${text}  (on ${at + 1})` : text, key));
+      }
+      sel.append(group);
+    }
+    sel.value = chan[i];
+    row.classList.toggle('unused', !chan[i]);
+  });
+  renderChanLevels();
+}
+
+function renderChanLevels() {
+  const thr = clampInt($('#thresholdNum').value, 1, 255, 128);
+  $$('.chan-row').forEach((row, i) => {
+    const d = st && st.inputs ? st.inputs.dmx[i] : -1, a = st && st.inputs ? st.inputs.art[i] : -1;
+    const v = d >= 0 ? d : a, bar = $('.mbar', row);
+    bar.classList.toggle('art', d < 0 && a >= 0);
+    $('i', bar).style.transform = `scaleX(${v >= 0 ? v / 255 : 0})`;
+    const t = $('.thr', bar);
+    t.hidden = !usesThreshold(chan[i]);
+    t.style.left = (thr / 2.55) + '%';
+    $('.chan-val', row).textContent = v >= 0 ? v : '—';
+  });
+  renderZoneMarker();
+}
+
+function dirSettings() {
+  return {
+    single: segValue($('#motorMode')) === 'single',
+    slot: slotOf('dir'),
+    center: clampInt($('#dirCenter').value, 1, 254, 128),
+    dead: clampInt($('#deadZone').value, 0, 127, 20),
+  };
+}
+
+function syncMotorMode() {
+  const d = dirSettings();
+  $('#dirFields').hidden = !d.single;
+  const lo = Math.max(0, d.center - d.dead), hi = Math.min(255, d.center + d.dead);
+  const z = $('#zones');
+  $('.z-left', z).style.flex = String(lo);
+  $('.z-stop', z).style.flex = String(hi - lo + 1);
+  $('.z-right', z).style.flex = String(255 - hi);
+  const left = lo > 0 ? `left 0–${lo - 1}` : 'no left zone', right = hi < 255 ? `right ${hi + 1}–255` : 'no right zone';
+  $('#zonesHint').textContent = `${left[0].toUpperCase() + left.slice(1)} · stop ${lo}–${hi} · ${right}` +
+    (d.slot ? ` · on channel ${d.slot}` : ' · pick a channel for Motor direction above');
+  renderZoneMarker();
+}
+
+// Live position of the direction channel on the zone bar.
+function renderZoneMarker() {
+  const d = dirSettings(), m = $('#zones .marker');
+  const raw = d.single && d.slot && st && st.inputs ? Math.max(st.inputs.dmx[d.slot - 1], st.inputs.art[d.slot - 1]) : -1;
+  m.hidden = raw < 0;
+  if (raw >= 0) m.style.left = (raw / 255 * 100) + '%';
+}
+
+// Switching motor modes carries the motor's channel over.
+$('#motorMode').addEventListener('change', () => {
+  if (segValue($('#motorMode')) === 'single') {
+    const from = chan.includes('left') ? chan.indexOf('left') : chan.indexOf('right');
+    chan = chan.map(k => (k === 'left' || k === 'right' ? '' : k));
+    if (from >= 0) chan[from] = 'dir';
+  } else {
+    chan = chan.map(k => (k === 'dir' ? 'left' : k));
+  }
+  renderChan();
+});
+
 function refreshRangeLabels() {
   const ds = clampInt($('#dmxStart').value, 1, 505, 1), as = clampInt($('#artStart').value, 1, 505, 1);
   const u = clampInt($('#artUniverse').value, 0, 32767, 0);
-  $('#dmxRange').textContent = `DMX ${pad3(ds)} – ${pad3(ds + 7)}`;
-  $('#artRange').textContent = `U${u} · ${pad3(as)} – ${pad3(as + 7)}`;
+  $('#dmxRange').textContent = `Channels ${pad3(ds)}–${pad3(ds + 7)}`;
+  $('#artRange').textContent = `Channels ${pad3(as)}–${pad3(as + 7)}`;
   $('#artNsu').textContent = `Net ${u >> 8} · Sub-Net ${(u >> 4) & 15} · Universe ${u & 15}`;
   $$('[data-map]').forEach(sel => {
     const cur = sel.value;
@@ -926,7 +1502,9 @@ function refreshRangeLabels() {
   });
   const t = clampInt($('#thresholdNum').value, 1, 255, 128);
   $('#threshold').style.setProperty('--p', (t - 1) / 2.54 + '%');
-  $('#thresholdHint').textContent = `Relay closes at ${t}/255 (${Math.round(t / 2.55)}%)`;
+  $('#thresholdHint').textContent = `On at ${t}/255 (${Math.round(t / 2.55)}%)`;
+  syncMotorMode();
+  renderChan();
 }
 
 function fillMapping() {
@@ -939,8 +1517,18 @@ function fillMapping() {
   $('#merge').value = cfg.relays.merge;
   setSeg($('#loss'), cfg.relays.loss);
   $('#lossTimeout').value = cfg.relays.lossTimeout;
+  $('#reverseDelay').value = cfg.anim.reverseDelay;
+  $('#limitIgnore').value = cfg.anim.limitIgnore;
+  $('#maxRun').value = cfg.anim.maxRun;
+  setSeg($('#limitType'), cfg.anim.limitType);
+  $('#animSwap').checked = cfg.anim.swap;
+  setSeg($('#motorMode'), cfg.anim.motorMode);
+  $('#dirCenter').value = cfg.anim.center;
+  $('#deadZone').value = cfg.anim.deadZone;
   $$('[data-name]').forEach(el => el.value = cfg.relays.names[el.dataset.name]);
+  $$('[data-rname]').forEach(el => el.value = cfg.relays.names[el.dataset.rname]);
   $$('[data-map]').forEach(el => el.value = '0');
+  chanFromConfig();
   refreshRangeLabels();
   $$('[data-map]').forEach(el => el.value = String(cfg.relays.map[el.dataset.map]));
   setDirty(false);
@@ -952,15 +1540,22 @@ function setDirty(d) {
 }
 
 $('#page-mapping').addEventListener('input', e => {
+  if (e.target.matches('[data-chan]')) return;  // handled by its change event, after `chan` updates
   if (e.target.id === 'threshold') $('#thresholdNum').value = e.target.value;
   if (e.target.id === 'thresholdNum') $('#threshold').value = e.target.value;
   refreshRangeLabels();
   setDirty(true);
 });
-$('#page-mapping').addEventListener('change', () => setDirty(true));
+$('#page-mapping').addEventListener('change', () => {
+  syncMotorMode();
+  setDirty(true);
+});
 $('#mapRevert').addEventListener('click', fillMapping);
 
 $('#mapSave').addEventListener('click', async () => {
+  const animBuild = st && st.variant === 'animatronic';
+  const single = segValue($('#motorMode')) === 'single';
+  const range = n => [...Array(n).keys()];
   const body = {
     dmx: { enabled: $('#dmxEnabled').checked, start: clampInt($('#dmxStart').value, 1, 505, 1) },
     artnet: {
@@ -973,10 +1568,29 @@ $('#mapSave').addEventListener('click', async () => {
       merge: $('#merge').value,
       loss: segValue($('#loss')),
       lossTimeout: Math.min(60, Math.max(1, parseFloat($('#lossTimeout').value) || 5)),
-      map: $$('[data-map]').map(el => parseInt(el.value, 10)),
-      names: $$('[data-name]').map((el, i) => el.value.trim() || `Relay ${i + 1}`),
+      map: animBuild
+        ? range(8).map(i => (i < 3 ? 0 : slotOf('relay' + i)))
+        : $$('[data-map]').map(el => parseInt(el.value, 10)),
+      names: range(8).map(i => animBuild
+        ? (i < 3 ? cfg.relays.names[i] : relayName(i))
+        : ($(`[data-name="${i}"]`).value.trim() || `Relay ${i + 1}`)),
+    },
+    anim: {
+      reverseDelay: clampInt($('#reverseDelay').value, 0, 10000, 500),
+      limitIgnore: clampInt($('#limitIgnore').value, 0, 10000, 300),
+      maxRun: clampInt($('#maxRun').value, 0, 3600, 30),
+      limitType: segValue($('#limitType')),
+      swap: $('#animSwap').checked,
+      motorMode: single ? 'single' : 'dual',
+      center: clampInt($('#dirCenter').value, 1, 254, 128),
+      deadZone: clampInt($('#deadZone').value, 0, 127, 20),
     },
   };
+  if (animBuild) {
+    body.anim.map = [single ? 0 : slotOf('left'), single ? 0 : slotOf('right'), slotOf('eyes')];
+    body.anim.dirChannel = single ? slotOf('dir') : 0;
+    body.sfx = { map: range(4).map(i => slotOf('sfx' + i)), volChannel: slotOf('vol') };
+  }
   const btn = $('#mapSave');
   btn.disabled = true;
   try {
@@ -1206,6 +1820,8 @@ async function loadConfig() {
 
 buildRelays();
 buildMap();
+buildChan();
+buildSfx();
 showTab(location.hash.slice(1) || 'status');
 loadConfig().then(startLive);
 </script>

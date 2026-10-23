@@ -20,6 +20,10 @@
 #define PIN_RS485_TX  17
 #define PIN_RS485_RX  18
 
+// Optocoupler-isolated digital inputs DI1-DI8 (GPIO 4-11). A closed dry contact
+// between DIx and DGND reads LOW.
+#define PIN_DI1       4
+
 #define PIN_STATUS_LED   38     // single WS2812
 #define PIN_BOOT_BTN  0      // hold 5 s for factory reset
 

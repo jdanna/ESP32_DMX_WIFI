@@ -1,0 +1,15 @@
+{
+  "name": "usb_host_uac",
+  "version": "1.5.0",
+  "description": "Espressif USB Host UAC (USB Audio Class 1.0) driver, vendored from https://github.com/espressif/esp-usb/tree/f3408e8cfc0ca99bf8686a4acfd9d3de7522df81/host/class/uac/usb_host_uac (Apache-2.0)",
+  "license": "Apache-2.0",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "build": {
+    "flags": [
+      "-DUSB_HOST_UAC_VER_MAJOR=1",
+      "-DUSB_HOST_UAC_VER_MINOR=5",
+      "-DUSB_HOST_UAC_VER_PATCH=0"
+    ]
+  }
+}

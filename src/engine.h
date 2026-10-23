@@ -4,8 +4,12 @@
 
 #include <IPAddress.h>
 #include "config.h"
+#ifdef ANIMATRONIC
+#include "anim.h"
+#include "sfx.h"
+#endif
 
-enum RelaySource : uint8_t { SRC_NONE, SRC_DMX, SRC_ART, SRC_MANUAL, SRC_HOLD };
+enum RelaySource : uint8_t { SRC_NONE, SRC_DMX, SRC_ART, SRC_MANUAL, SRC_HOLD, SRC_ANIM };
 
 struct InputStatus {
   bool live;
@@ -20,10 +24,15 @@ struct EngineStatus {
   IPAddress artFrom;
   int16_t dmxValue[RELAY_COUNT];  // -1 when the input isn't live or the relay is unassigned
   int16_t artValue[RELAY_COUNT];
+  int16_t inDmx[RELAY_COUNT];     // raw values of the 8 input slots, -1 when the input isn't live
+  int16_t inArt[RELAY_COUNT];
   RelaySource source[RELAY_COUNT];
   uint8_t relayMask;
   bool manual;
   bool expanderOk;
+#ifdef ANIMATRONIC
+  AnimStatus anim;
+#endif
 };
 
 void engineBegin(const IoSettings &io);

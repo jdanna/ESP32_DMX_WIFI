@@ -10,13 +10,16 @@
 #include "engine.h"
 #include "net.h"
 #include "web_index.h"
+#ifdef ANIMATRONIC
+#include <LittleFS.h>
+#endif
 
 namespace {
 
 WebServer server(80);
 uint32_t rebootAt;
 
-const char *SOURCE_NAMES[] = {nullptr, "dmx", "artnet", "manual", "hold"};
+const char *SOURCE_NAMES[] = {nullptr, "dmx", "artnet", "manual", "hold", "anim"};
 
 // Live updates are pushed as Server-Sent Events. The relay engine runs in a
 // higher-priority task and DMX in an ISR, so nothing here can delay them.
@@ -72,6 +75,7 @@ void handleIndex() {
 
 void buildStatus(JsonObject root) {
   root["fw"] = FW_VERSION;
+  root["variant"] = FW_VARIANT;
   root["hostname"] = g_cfg.hostname;
   root["uptime"] = millis() / 1000;
   root["heap"] = ESP.getFreeHeap();
@@ -103,6 +107,29 @@ void buildStatus(JsonObject root) {
     if (st.artValue[i] >= 0) r["art"] = st.artValue[i];
     if (SOURCE_NAMES[st.source[i]]) r["src"] = SOURCE_NAMES[st.source[i]];
   }
+  JsonObject inputs = root["inputs"].to<JsonObject>();
+  JsonArray inDmx = inputs["dmx"].to<JsonArray>(), inArt = inputs["art"].to<JsonArray>();
+  for (int i = 0; i < RELAY_COUNT; i++) {
+    inDmx.add(st.inDmx[i]);
+    inArt.add(st.inArt[i]);
+  }
+
+#ifdef ANIMATRONIC
+  JsonObject an = root["anim"].to<JsonObject>();
+  an["dir"] = motorDirName(st.anim.dir);
+  an["target"] = motorDirName(st.anim.target);
+  an["atLimit"] = motorDirName(st.anim.atLimit);
+  if (stopReasonName(st.anim.reason)) an["reason"] = stopReasonName(st.anim.reason);
+  an["limit"] = st.anim.limit;
+  an["closed"] = st.anim.closed;
+  an["override"] = st.anim.override;
+  an["eyes"] = st.anim.eyes;
+
+  JsonObject sx = root["sfx"].to<JsonObject>();
+  sfxStatusJson(sx);
+  JsonArray slots = sx["slots"];
+  for (int i = 0; i < SFX_COUNT; i++) slots[i]["name"] = g_cfg.sfxNames[i];
+#endif
 }
 
 void handleStatus() {
@@ -122,11 +149,31 @@ String liveJson(const EngineStatus &st) {
   doc["al"] = st.art.live;
   doc["af"] = st.art.fps;
   JsonArray d = doc["d"].to<JsonArray>(), a = doc["a"].to<JsonArray>(), src = doc["s"].to<JsonArray>();
+  JsonArray id = doc["id"].to<JsonArray>(), ia = doc["ia"].to<JsonArray>();
   for (int i = 0; i < RELAY_COUNT; i++) {
     d.add(st.dmxValue[i]);
     a.add(st.artValue[i]);
     src.add((int)st.source[i]);
+    id.add(st.inDmx[i]);
+    ia.add(st.inArt[i]);
   }
+#ifdef ANIMATRONIC
+  // [dir, target, atLimit, reason, limit, closed, override, eyes]
+  JsonArray an = doc["an"].to<JsonArray>();
+  an.add((int)st.anim.dir);
+  an.add((int)st.anim.target);
+  an.add((int)st.anim.atLimit);
+  an.add((int)st.anim.reason);
+  an.add(st.anim.limit);
+  an.add(st.anim.closed);
+  an.add(st.anim.override);
+  an.add(st.anim.eyes);
+  // [playing mask, volume %, volume set by an input]
+  JsonArray sx = doc["sx"].to<JsonArray>();
+  sx.add(sfxPlayingMask());
+  sx.add(sfxVolume());
+  sx.add(sfxVolumeFromInput());
+#endif
   String out;
   serializeJson(doc, out);
   return out;
@@ -228,10 +275,23 @@ void handlePostConfig() {
   if (!readBody(in)) return;
   String err;
   bool networkChanged = false;
-  if (!configFromJson(g_cfg, in.as<JsonObjectConst>(), err, networkChanged)) {
+  Config c = g_cfg;
+  if (!configFromJson(c, in.as<JsonObjectConst>(), err, networkChanged)) {
     sendError(400, err);
     return;
   }
+#ifdef ANIMATRONIC
+  // Only requests that change the mapping are checked, so a volume change still
+  // saves on a device whose older settings share channels.
+  const bool mapping = !in["relays"]["map"].isNull() || !in["anim"]["map"].isNull() ||
+                       !in["anim"]["dirChannel"].isNull() || !in["anim"]["motorMode"].isNull() ||
+                       !in["sfx"]["map"].isNull() || !in["sfx"]["volChannel"].isNull();
+  if (mapping && !configMappingExclusive(c, err)) {
+    sendError(400, err);
+    return;
+  }
+#endif
+  g_cfg = c;
   configSave(g_cfg);
   engineApply(g_cfg.io);
 
@@ -253,6 +313,117 @@ void handleRelays() {
   doc["ok"] = true;
   sendJson(200, doc);
 }
+
+#ifdef ANIMATRONIC
+void handleAnim() {
+  JsonDocument in;
+  if (!readBody(in)) return;
+  if (in["override"].is<bool>()) animOverride(in["override"]);
+  if (in["eyes"].is<bool>()) animEyes(in["eyes"]);
+  if (!in["motor"].isNull()) {
+    const char *m = in["motor"];
+    MotorDir dir;
+    if (m && !strcmp(m, "left")) dir = MOTOR_LEFT;
+    else if (m && !strcmp(m, "right")) dir = MOTOR_RIGHT;
+    else if (m && !strcmp(m, "stop")) dir = MOTOR_STOP;
+    else {
+      sendError(400, "motor must be left, right or stop");
+      return;
+    }
+    String err;
+    if (!animMotor(dir, err)) {
+      sendError(409, err);
+      return;
+    }
+  }
+  JsonDocument doc;
+  doc["ok"] = true;
+  sendJson(200, doc);
+}
+
+// Sound uploads land in a scratch file; the slot's old sound is dropped first
+// so a replacement doesn't need room for both.
+File sfxFile;
+String sfxUploadErr;
+
+int sfxSlotArg() {
+  const int slot = server.arg("slot").toInt() - 1;
+  return slot >= 0 && slot < SFX_COUNT ? slot : -1;
+}
+
+void handleSfxUploadData() {
+  HTTPUpload &up = server.upload();
+  switch (up.status) {
+    case UPLOAD_FILE_START:
+      sfxUploadErr = "";
+      if (sfxSlotArg() < 0) {
+        sfxUploadErr = "slot must be 1-4";
+        break;
+      }
+      sfxDelete(sfxSlotArg());
+      LittleFS.remove(sfxUploadPath());
+      sfxFile = LittleFS.open(sfxUploadPath(), "w");
+      if (!sfxFile) sfxUploadErr = "Can't create the file";
+      break;
+    case UPLOAD_FILE_WRITE:
+      if (sfxFile && sfxFile.write(up.buf, up.currentSize) != up.currentSize) {
+        sfxFile.close();
+        LittleFS.remove(sfxUploadPath());
+        sfxUploadErr = "Not enough storage space for this sound";
+      }
+      break;
+    case UPLOAD_FILE_END:
+      if (sfxFile) sfxFile.close();
+      break;
+    case UPLOAD_FILE_ABORTED:
+      if (sfxFile) sfxFile.close();
+      LittleFS.remove(sfxUploadPath());
+      sfxUploadErr = "Upload interrupted";
+      break;
+  }
+}
+
+void handleSfxUploadDone() {
+  const int slot = sfxSlotArg();
+  String err = sfxUploadErr;
+  if (!err.length() && slot < 0) err = "slot must be 1-4";
+  if (!err.length()) sfxInstall(slot, err);
+  if (slot >= 0) {
+    String name = err.length() ? String() : server.arg("name");
+    name.trim();
+    if (!err.length() && !name.length()) name = String("Sound ") + (slot + 1);
+    strlcpy(g_cfg.sfxNames[slot], name.c_str(), sizeof(g_cfg.sfxNames[slot]));
+    configSave(g_cfg);
+  }
+  if (err.length()) {
+    sendError(400, err);
+    return;
+  }
+  JsonDocument doc;
+  doc["ok"] = true;
+  sendJson(200, doc);
+}
+
+void handleSfx() {
+  JsonDocument in;
+  if (!readBody(in)) return;
+  if (in["play"].is<int>()) sfxPlay(in["play"].as<int>());
+  if (in["stop"].is<int>()) sfxStop(in["stop"].as<int>());
+  if (in["delete"].is<int>()) {
+    const int slot = in["delete"];
+    if (slot < 0 || slot >= SFX_COUNT) {
+      sendError(400, "delete must be 0-3");
+      return;
+    }
+    sfxDelete(slot);
+    g_cfg.sfxNames[slot][0] = 0;
+    configSave(g_cfg);
+  }
+  JsonDocument doc;
+  doc["ok"] = true;
+  sendJson(200, doc);
+}
+#endif
 
 void handleScan() {
   JsonDocument doc;
@@ -344,6 +515,11 @@ void webBegin() {
   server.on("/api/config", HTTP_GET, handleGetConfig);
   server.on("/api/config", HTTP_POST, handlePostConfig);
   server.on("/api/relays", HTTP_POST, handleRelays);
+#ifdef ANIMATRONIC
+  server.on("/api/anim", HTTP_POST, handleAnim);
+  server.on("/api/sfx", HTTP_POST, handleSfx);
+  server.on("/api/sfx/upload", HTTP_POST, handleSfxUploadDone, handleSfxUploadData);
+#endif
   server.on("/api/scan", HTTP_GET, handleScan);
   server.on("/api/reboot", HTTP_POST, handleReboot);
   server.on("/api/factory-reset", HTTP_POST, handleFactoryReset);

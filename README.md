@@ -18,6 +18,7 @@ DMX512 + Art-Net controlled 8-relay firmware for the Waveshare
 | | or `curl -F "firmware=@firmware/dmx-relay-1.1.0.bin" http://<ip>/api/update` |
 | **First flash / recovery (USB)** | `esptool --chip esp32s3 write-flash 0x0 firmware/dmx-relay-1.1.0-factory.bin` |
 | **Build from source** | VS Code + PlatformIO → **Upload** (→), or `pio run -t upload` |
+| **Animatronic build** | Same, with `firmware/animatronic-1.1.0.bin` / `-factory.bin`, or `pio run -e animatronic -t upload` |
 
 USB won't connect? Hold **BOOT**, tap **RESET**, release BOOT.
 
@@ -51,6 +52,35 @@ Factory reset: hold **BOOT** 5 s.
 - Art-Net universe = 15-bit port-address: `10` = Net 0 · Sub-Net 0 · Uni 10.
 
 Test Art-Net: `python3 tools/artnet_test.py <ip> --universe 10`
+
+## Animatronic build
+
+A second build of the same source (`pio run -e animatronic`) turns the board into an animatronic controller. It
+shares the settings storage, so switching builds keeps the network and DMX setup.
+
+| Hardware | Use |
+|---|---|
+| Relays 1 + 2 | H-bridge for a reversing DC motor: each **COM** to a motor lead, **NO** to +V, **NC** to GND |
+| Relay 3 | Eyes / lights |
+| Relays 4–8 | Ordinary DMX relays |
+| DI1 | Limit switch, dry contact between **DI1** and **DGND** |
+| USB-C | USB speaker for sound effects (USB Audio Class 1.0) |
+
+- **Status:** Left / Stop / Right (keys **← ↓ →**), Eyes (**↑**), limit override, 4 sound slots with upload, volume.
+- **Motor:** a move runs until the limit switch, Stop, or the max run time. A limit hit blocks that direction until
+  it runs the other way. Direction changes pass through off and wait the reverse delay (default 500 ms). Relays 1
+  and 2 are never on together.
+- **Mapping:** the 8 channels each drive one output (motor left/right or a single direction channel with center +
+  dead zone, eyes, sound 1–4, volume, relays 4–8). Choosing an output that's in use moves it.
+- **Sounds:** uploads (WAV, MP3, …) are converted in the browser to mono 24 kHz and stored on the device (~70 s
+  total). A channel rising above the threshold plays its sound.
+- **USB audio** (System page) makes the USB-C port a host, so USB serial stops working while it's on. The speaker
+  needs 5 V from the port; use a powered hub if the board doesn't supply it. Flash over USB by holding **BOOT**.
+
+Extra API: `POST /api/anim` `{"motor":"left"|"right"|"stop"}`, `{"eyes":true}`, `{"override":true}` ·
+`POST /api/sfx` `{"play":0}`, `{"stop":0}`, `{"delete":0}` · `POST /api/sfx/upload?slot=1&name=…` (multipart WAV).
+
+The USB Audio Class driver is Espressif's `usb_host_uac`, vendored in `lib/usb_host_uac` (Apache-2.0).
 
 ## Status LED
 

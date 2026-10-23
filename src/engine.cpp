@@ -12,6 +12,11 @@ constexpr uint16_t OP_POLL = 0x2000;
 constexpr uint16_t OP_POLL_REPLY = 0x2100;
 constexpr uint16_t OP_DMX = 0x5000;
 constexpr uint32_t REFRESH_MS = 1000;  // rewrite the expander periodically even without changes
+#ifdef ANIMATRONIC
+constexpr uint8_t ANIM_MASK = ANIM_RELAY_MASK;  // relays driven by the animatronic controller
+#else
+constexpr uint8_t ANIM_MASK = 0;
+#endif
 
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 IoSettings pending;
@@ -31,7 +36,10 @@ uint16_t artSlots;
 uint32_t artLastMs, artCount, artWindowCount, artPollCount;
 IPAddress artFrom;
 bool everDmx, everArt;
-uint8_t relayMask, writtenMask;
+uint8_t relayMask, outMask, writtenMask;  // relayMask: what the inputs ask for; outMask: what's driven
+uint8_t fnMask;                           // animatronic functions the inputs ask for, bit = AnimFn
+uint8_t sfxMask;                          // sound triggers the inputs ask for
+int16_t inputVolume = -1;                 // last volume-channel level, -1 = none
 bool expanderOk;
 uint32_t lastWriteMs, windowStartMs;
 uint16_t dmxFps, artFps;
@@ -137,6 +145,36 @@ int artValue(int slot, bool live) {
   return ch <= artSlots ? artData[ch - 1] : 0;
 }
 
+// Which input supplies a slot's value while at least one input is live.
+bool useDmx(bool dmxLive, bool artLive, int dv, int av) {
+  switch (io.merge) {
+    case MERGE_LTP: return dmxLive && (!artLive || (int32_t)(dmxLastMs - artLastMs) >= 0);
+    case MERGE_DMX_FIRST: return dmxLive;
+    case MERGE_ART_FIRST: return !artLive;
+    default: return dv >= av;  // HTP: highest value wins
+  }
+}
+
+// Next state of an output driven by input `slot` (0 = unassigned), given whether it's on now.
+bool decide(int slot, bool on, bool dmxLive, bool artLive, int dv, int av, RelaySource &src) {
+  if (!dmxLive && !artLive) {
+    if (io.loss == LOSS_OFF || !on) {
+      src = SRC_NONE;
+      return false;
+    }
+    src = SRC_HOLD;
+    return true;
+  }
+  if (!slot) {
+    src = SRC_NONE;
+    return false;
+  }
+
+  const bool dmx = useDmx(dmxLive, artLive, dv, av);
+  src = dmx ? SRC_DMX : SRC_ART;
+  return (dmx ? dv : av) >= io.threshold;
+}
+
 void evaluate(uint32_t now, EngineStatus &st) {
   const bool dmxLive = io.dmxEnabled && everDmx && now - dmxLastMs < io.lossTimeoutMs;
   const bool artLive = io.artEnabled && everArt && now - artLastMs < io.lossTimeoutMs;
@@ -156,39 +194,67 @@ void evaluate(uint32_t now, EngineStatus &st) {
       sources[i] = SRC_MANUAL;
       continue;
     }
-    if (!dmxLive && !artLive) {
-      if (io.loss == LOSS_OFF || !(relayMask & bit)) {
-        relayMask &= ~bit;
-        sources[i] = SRC_NONE;
-      } else {
-        sources[i] = SRC_HOLD;
-      }
-      continue;
-    }
-    if (!slot) {
-      relayMask &= ~bit;
-      sources[i] = SRC_NONE;
-      continue;
-    }
-
-    bool useDmx;
-    switch (io.merge) {
-      case MERGE_LTP: useDmx = dmxLive && (!artLive || (int32_t)(dmxLastMs - artLastMs) >= 0); break;
-      case MERGE_DMX_FIRST: useDmx = dmxLive; break;
-      case MERGE_ART_FIRST: useDmx = !artLive; break;
-      default: useDmx = dv >= av; break;  // HTP: highest value wins
-    }
-    const int v = useDmx ? dv : av;
-    sources[i] = useDmx ? SRC_DMX : SRC_ART;
-    if (v >= io.threshold) relayMask |= bit;
+    if (decide(slot, relayMask & bit, dmxLive, artLive, dv, av, sources[i])) relayMask |= bit;
     else relayMask &= ~bit;
   }
+
+  for (int s = 1; s <= RELAY_COUNT; s++) {
+    st.inDmx[s - 1] = dmxValue(s, dmxLive);
+    st.inArt[s - 1] = artValue(s, artLive);
+  }
+
+#ifdef ANIMATRONIC
+  const AnimSettings &an = io.anim;
+  for (int f = 0; f < ANIM_FN_COUNT; f++) {
+    if (an.singleDir && (f == FN_LEFT || f == FN_RIGHT)) continue;
+    const int slot = an.map[f];
+    const uint8_t bit = 1 << f;
+    RelaySource src;
+    if (decide(slot, fnMask & bit, dmxLive, artLive, dmxValue(slot, dmxLive), artValue(slot, artLive), src))
+      fnMask |= bit;
+    else fnMask &= ~bit;
+  }
+
+  if (an.singleDir) {
+    constexpr uint8_t MOTOR_BITS = (1 << FN_LEFT) | (1 << FN_RIGHT);
+    const int slot = an.dirSlot;
+    if (dmxLive || artLive) {
+      fnMask &= ~MOTOR_BITS;
+      if (slot) {
+        const int dv = dmxValue(slot, dmxLive), av = artValue(slot, artLive);
+        const int v = useDmx(dmxLive, artLive, dv, av) ? dv : av;
+        if (v < an.center - an.deadZone) fnMask |= 1 << FN_LEFT;
+        else if (v > an.center + an.deadZone) fnMask |= 1 << FN_RIGHT;
+      }
+    } else if (io.loss == LOSS_OFF) {
+      fnMask &= ~MOTOR_BITS;
+    }
+  }
+
+  for (int k = 0; k < SFX_COUNT; k++) {
+    const int slot = io.sfx.map[k];
+    const uint8_t bit = 1 << k;
+    RelaySource src;
+    if (decide(slot, sfxMask & bit, dmxLive, artLive, dmxValue(slot, dmxLive), artValue(slot, artLive), src))
+      sfxMask |= bit;
+    else sfxMask &= ~bit;
+  }
+  // The volume channel overrides the web volume while live, and holds or drops on signal loss like a relay.
+  const int vslot = io.sfx.volSlot;
+  if (vslot && (dmxLive || artLive)) {
+    const int dv = dmxValue(vslot, dmxLive), av = artValue(vslot, artLive);
+    inputVolume = useDmx(dmxLive, artLive, dv, av) ? dv : av;
+  } else if (!vslot || io.loss == LOSS_OFF) {
+    inputVolume = -1;
+  }
+  const uint8_t volume = inputVolume >= 0 ? (inputVolume * 100 + 127) / 255 : io.sfx.volume;
+  sfxInput(sfxMask, !man, volume, inputVolume >= 0);
+#endif
 
   st.dmx = {dmxLive, dmxFps, dmxCount, dmxErrorCount(), dmxSlots};
   st.art = {artLive, artFps, artCount, 0, artSlots};
   st.artFrom = artFrom;
   memcpy(st.source, sources, sizeof(sources));
-  st.relayMask = relayMask;
   st.manual = man;
 }
 
@@ -218,10 +284,24 @@ void engineTask(void *) {
 
     EngineStatus st = {};
     evaluate(now, st);
+    outMask = relayMask;
+#ifdef ANIMATRONIC
+    outMask = (relayMask & ~ANIM_MASK) | animUpdate(now, io.anim, fnMask, !st.manual, st.anim);
+    if ((outMask & 0x03) == 0x03) outMask &= ~0x03;  // last-ditch guard: never both motor relays at once
+    // Relay tiles 1-3 show the levels of the function driving them.
+    const uint8_t fnOf[3] = {uint8_t(io.anim.swap ? FN_RIGHT : FN_LEFT), uint8_t(io.anim.swap ? FN_LEFT : FN_RIGHT), FN_EYES};
+    for (int i = 0; i < 3; i++) {
+      const int slot = io.anim.singleDir && fnOf[i] != FN_EYES ? io.anim.dirSlot : io.anim.map[fnOf[i]];
+      st.dmxValue[i] = slot ? st.inDmx[slot - 1] : -1;
+      st.artValue[i] = slot ? st.inArt[slot - 1] : -1;
+      st.source[i] = SRC_ANIM;
+    }
+#endif
+    st.relayMask = outMask;
 
-    if (relayMask != writtenMask || now - lastWriteMs >= REFRESH_MS) {
-      expanderOk = relaysWrite(relayMask);
-      if (expanderOk) writtenMask = relayMask;
+    if (outMask != writtenMask || now - lastWriteMs >= REFRESH_MS) {
+      expanderOk = relaysWrite(outMask);
+      if (expanderOk) writtenMask = outMask;
       lastWriteMs = now;
     }
     st.expanderOk = expanderOk;
@@ -240,6 +320,9 @@ void engineBegin(const IoSettings &settings) {
   io = settings;
   expanderOk = relaysBegin();
   if (!expanderOk) log_e("TCA9554 relay expander not responding");
+#ifdef ANIMATRONIC
+  animBegin();
+#endif
   xTaskCreatePinnedToCore(engineTask, "engine", 6144, nullptr, 5, nullptr, 1);
 }
 
