@@ -44,6 +44,9 @@ Factory reset: hold **BOOT** 5 s.
 
 <img src="docs/system.png" width="70%">
 
+**Log:** errors, warnings and events since boot (network, OTA, relay driver, USB audio, reset reason), live, with
+level filter and download. The USB speaker's bring-up is logged step by step, so start there when sound doesn't work.
+
 ## Behaviour
 
 - Relay **on** when its channel ≥ threshold (default 128).
@@ -63,21 +66,28 @@ shares the settings storage, so switching builds keeps the network and DMX setup
 | Relays 1 + 2 | H-bridge for a reversing DC motor: each **COM** to a motor lead, **NO** to +V, **NC** to GND |
 | Relay 3 | Eyes / lights |
 | Relays 4–8 | Ordinary DMX relays |
-| DI1 | Limit switch, dry contact between **DI1** and **DGND** |
+| DI1 | Center switch (closes when the head faces forward), dry contact between **DI1** and **DGND** |
 | USB-C | USB speaker for sound effects (USB Audio Class 1.0) |
 
-- **Status:** Left / Stop / Right (keys **← ↓ →**), Eyes (**↑**), limit override, 4 sound slots with upload, volume.
-- **Motor:** a move runs until the limit switch, Stop, or the max run time. A limit hit blocks that direction until
-  it runs the other way. Direction changes pass through off and wait the reverse delay (default 500 ms). Relays 1
-  and 2 are never on together.
+- **Status:** Left / Stop / Right (keys **← ↓ →**), Eyes (**↑**), Find center (**H**), ignore travel limit, 4 sound
+  slots with upload, volume.
+- **Homing:** at power-up (2 s in, can be turned off) or on **Find center**, the head swings left, then right, each
+  swing 250 ms further from where it started, up to the **max swing** (default 2.5 s), until the center switch
+  closes. If it's not found either way the head goes back to where it started. The last known position is saved,
+  so after a restart homing first runs straight toward center, and searches the other side if it isn't there.
+- **Motor:** once homed, the head's position is tracked by run time and re-zeroed every time it passes center; a
+  move stops at the max swing either side of center, and that direction stays blocked until it moves back. Before
+  homing, a move stops after the max swing time. Direction changes pass through off and wait the reverse delay
+  (default 500 ms). Relays 1 and 2 are never on together.
 - **Mapping:** the 8 channels each drive one output (motor left/right or a single direction channel with center +
   dead zone, eyes, sound 1–4, volume, relays 4–8). Choosing an output that's in use moves it.
 - **Sounds:** uploads (WAV, MP3, …) are converted in the browser to mono 24 kHz and stored on the device (~70 s
   total). A channel rising above the threshold plays its sound.
-- **USB audio** (System page) makes the USB-C port a host, so USB serial stops working while it's on. The speaker
-  needs 5 V from the port; use a powered hub if the board doesn't supply it. Flash over USB by holding **BOOT**.
+- **USB audio** (System page) makes the USB-C port a host, so USB serial stops working while it's on. The board
+  doesn't put 5 V on that port, so the speaker needs 5 V fed onto VBUS, e.g. a USB-C OTG adapter with a power input.
+  A powered hub alone doesn't work: hubs only connect when they see 5 V from the host. Flash over USB by holding **BOOT**.
 
-Extra API: `POST /api/anim` `{"motor":"left"|"right"|"stop"}`, `{"eyes":true}`, `{"override":true}` ·
+Extra API: `POST /api/anim` `{"motor":"left"|"right"|"stop"}`, `{"home":true}`, `{"eyes":true}`, `{"override":true}` ·
 `POST /api/sfx` `{"play":0}`, `{"stop":0}`, `{"delete":0}` · `POST /api/sfx/upload?slot=1&name=…` (multipart WAV).
 
 The USB Audio Class driver is Espressif's `usb_host_uac`, vendored in `lib/usb_host_uac` (Apache-2.0).
@@ -101,6 +111,7 @@ RS485 **A** = DMX+ (XLR 3), **B** = DMX− (XLR 2). Fit the 120 Ω jumper on the
 | `GET/POST /api/config` | Settings (partial JSON on POST) |
 | `POST /api/relays` | `{"manual":true}`, `{"index":0,"on":true}`, `{"all":false}` |
 | `GET /api/scan` | Wi-Fi scan |
+| `GET /api/log?after=N` | Log entries newer than N · `POST /api/log` `{"clear":true}` |
 | `POST /api/update` | Firmware upload |
 | `POST /api/reboot`, `/api/factory-reset` | |
 

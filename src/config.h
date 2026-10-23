@@ -33,13 +33,13 @@ struct SfxSettings {
   uint8_t volume = 80;                    // percent, used while no volume channel is live
 };
 
-// Animatronic motor / limit-switch behaviour. Stored in every build so switching
+// Animatronic motor / center-switch behaviour. Stored in every build so switching
 // firmware variants keeps it; only ANIMATRONIC builds act on it.
 struct AnimSettings {
   uint16_t reverseDelayMs = 500;  // both relays off this long before the motor changes direction
-  uint16_t limitIgnoreMs = 300;   // limit-switch hits ignored this long after the motor starts
-  uint16_t maxRunS = 30;          // stop if no limit is reached within this time (0 = never)
-  bool limitNc = false;           // switch is normally closed (opens at the end of travel)
+  uint16_t maxSwingMs = 2500;     // furthest the head runs either side of center, also the homing search limit
+  bool homeOnBoot = true;         // find center by itself after power-up
+  bool limitNc = false;           // center switch is normally closed (opens at center)
   bool swap = false;              // swap which relay drives left and right
   uint8_t map[ANIM_FN_COUNT] = {1, 2, 3};  // function -> slot in range (1-8), 0 = unassigned
   // Single-channel steering, used instead of the left/right slots when enabled:

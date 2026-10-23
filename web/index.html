@@ -210,7 +210,8 @@ body[data-tab=status] footer { display: none; }
 .arrow.stop { color: var(--danger); border-color: rgba(var(--danger-rgb),0.35); background: rgba(var(--danger-rgb),0.06); }
 .arrow.stop:hover { background: rgba(var(--danger-rgb),0.12); }
 .arrow.flash { box-shadow: 0 0 0 4px rgba(255,255,255,0.25); }
-.anim-toggles { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 12px; position: relative; }
+.anim-pos { font-family: var(--mono); font-size: 13px; color: var(--muted); margin: -6px 0 12px; position: relative; }
+.anim-toggles { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-top: 12px; position: relative; }
 .kbd {
   display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 5px;
   font-family: var(--mono); font-size: 11px; font-weight: 600; line-height: 1; color: var(--muted);
@@ -417,6 +418,23 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .spinner { width: 36px; height: 36px; margin: 4px auto 18px; border-radius: 50%; border: 3px solid rgba(var(--accent-rgb),0.15); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ─── LOG ─────────────────────────────────────────────────── */
+.log-card .card-head { flex-wrap: wrap; }
+.log-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.log-tools .seg button { font-size: 13px; padding: 5px 12px; }
+.log-list { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; max-height: 68vh; overflow-y: auto; margin: 0 -24px -24px; border-top: 1px solid var(--border); }
+.log-row { display: grid; grid-template-columns: 74px 64px 56px minmax(0, 1fr); gap: 12px; padding: 7px 24px; border-bottom: 1px solid var(--border); }
+.log-row:last-child { border-bottom: 0; }
+.log-time { color: var(--subtle); white-space: nowrap; }
+.log-lvl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding-top: 1px; color: var(--muted); }
+.log-tag { color: var(--art); overflow: hidden; text-overflow: ellipsis; }
+.log-msg { overflow-wrap: anywhere; }
+.log-row.error { background: rgba(var(--danger-rgb),0.06); }
+.log-row.error .log-lvl { color: var(--danger); }
+.log-row.warn { background: rgba(var(--warn-rgb),0.05); }
+.log-row.warn .log-lvl { color: var(--warn); }
+.log-empty { padding: 28px 24px; color: var(--muted); font-size: 14px; }
+
 footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: center; font-size: 13px; color: var(--subtle); }
 
 /* ─── RESPONSIVE ──────────────────────────────────────────── */
@@ -467,6 +485,9 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
   .map-row.head { display: none; }
   .map-row select.input { margin-top: -4px; }
   .toast { left: 16px; right: 16px; max-width: none; }
+  .log-list { margin: 0 -18px -18px; max-height: none; }
+  .log-row { grid-template-columns: auto auto minmax(0, 1fr); gap: 2px 10px; padding: 8px 18px; }
+  .log-msg { grid-column: 1 / -1; }
   footer { padding: 24px 16px; }
 }
 @media (max-width: 380px) {
@@ -494,6 +515,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
       <li><button class="tab" data-tab="mapping"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3v18M12 3v18M18 3v18"/><rect x="3.5" y="13" width="5" height="3" rx="1" fill="currentColor"/><rect x="9.5" y="6" width="5" height="3" rx="1" fill="currentColor"/><rect x="15.5" y="15" width="5" height="3" rx="1" fill="currentColor"/></svg>Mapping</button></li>
       <li><button class="tab" data-tab="network"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M12 8v4M5 16v-4h14v4"/></svg>Network</button></li>
       <li><button class="tab" data-tab="system"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>System</button></li>
+      <li><button class="tab" data-tab="log"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Log</button></li>
     </ul>
     <span class="conn"><span class="badge" id="connBadge"><span class="dot"></span><span id="connText">Connecting</span></span></span>
   </div>
@@ -519,9 +541,10 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
     <div class="card" id="animCard">
       <div class="card-head">
         <span class="card-title">Animatronic</span>
-        <span class="badge" id="animLimit"><span class="dot"></span>Limit <span class="val"></span></span>
+        <span class="badge" id="animCenter"><span class="dot"></span>Center <span class="val"></span></span>
       </div>
       <div class="anim-state" id="animState">Stopped</div>
+      <div class="anim-pos" id="animPos">Not homed</div>
       <div class="arrows">
         <button class="arrow" type="button" data-motor="left"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 5l-7 7 7 7"/></svg>Left <span class="kbd">←</span></button>
         <button class="arrow stop" type="button" data-motor="stop"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>Stop <span class="kbd">↓</span></button>
@@ -529,7 +552,8 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
       </div>
       <div class="anim-toggles">
         <label class="switch"><input type="checkbox" id="eyesToggle"><span class="track"></span>Eyes <span class="kbd">↑</span></label>
-        <label class="switch warn-switch"><input type="checkbox" id="overrideToggle"><span class="track"></span>Override limit switch</label>
+        <button class="btn btn-secondary btn-sm" type="button" id="homeBtn">Find center <span class="kbd">H</span></button>
+        <label class="switch warn-switch" title="Let moves run past the max swing either side of center"><input type="checkbox" id="overrideToggle"><span class="track"></span>Ignore travel limit</label>
       </div>
     </div>
 
@@ -673,17 +697,17 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
           <input class="input mono" id="reverseDelay" type="number" inputmode="numeric" min="0" max="10000" step="50" data-dirty title="Both relays off this long before the motor changes direction">
         </div>
         <div class="field">
-          <label for="limitIgnore">Ignore limit (ms)</label>
-          <input class="input mono" id="limitIgnore" type="number" inputmode="numeric" min="0" max="10000" step="50" data-dirty title="Limit hits are ignored this long after starting, so the motor can drive off the switch it stopped on">
+          <label for="maxSwing">Max swing (ms)</label>
+          <input class="input mono" id="maxSwing" type="number" inputmode="numeric" min="100" max="30000" step="100" data-dirty title="Moves stop this far either side of center. Homing swings no further than this from where it starts">
         </div>
         <div class="field">
-          <label for="maxRun">Max run (s)</label>
-          <input class="input mono" id="maxRun" type="number" inputmode="numeric" min="0" max="3600" data-dirty title="Safety stop if no limit is reached. 0 = off">
+          <label>&nbsp;</label>
+          <label class="switch" title="Find center by itself a couple of seconds after power-up"><input type="checkbox" id="homeOnBoot" data-dirty><span class="track"></span>Home at startup</label>
         </div>
       </div>
       <div class="motor-opts">
-        <div class="seg" id="limitType" title="Limit switch on DI1 / DGND">
-          <button type="button" data-v="no">Switch normally open</button>
+        <div class="seg" id="limitType" title="Center switch on DI1 / DGND">
+          <button type="button" data-v="no">Center switch normally open</button>
           <button type="button" data-v="nc">Normally closed</button>
         </div>
         <label class="switch"><input type="checkbox" id="animSwap" data-dirty><span class="track"></span>Swap left / right</label>
@@ -824,6 +848,30 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
   </div>
 </section>
 
+<!-- ═══ LOG ══════════════════════════════════════════════════ -->
+<section class="page" id="page-log">
+  <div class="hero compact">
+    <h1><span class="gradient-text">Log</span></h1>
+    <p class="hero-sub">Errors, warnings and events since the device started. Kept in memory, so a restart clears it.</p>
+  </div>
+
+  <div class="card log-card">
+    <div class="card-head">
+      <span class="card-title" id="logCount">Events</span>
+      <div class="log-tools">
+        <div class="seg" id="logFilter">
+          <button type="button" data-v="all" class="active">All</button>
+          <button type="button" data-v="warn">Warnings</button>
+          <button type="button" data-v="error">Errors</button>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="logSave">Download</button>
+        <button class="btn btn-secondary btn-sm" id="logClear">Clear</button>
+      </div>
+    </div>
+    <div class="log-list" id="logList"></div>
+  </div>
+</section>
+
 </main>
 
 <footer>DMX Relay Node · <span class="mono" id="footFw"></span></footer>
@@ -865,6 +913,7 @@ function showTab(name) {
   document.body.dataset.tab = name;
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   $('#savebar').classList.toggle('show', dirty && name === 'mapping');
+  if (name === 'log') renderLog();
   if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
   window.scrollTo(0, 0);
 }
@@ -964,12 +1013,20 @@ function renderAnim() {
   const a = st.anim;
   if (!a) return;
   let text;
-  if (a.dir !== 'stop') text = 'Moving ' + a.dir;
+  if (a.home === 'searching') text = 'Finding center…';
+  else if (a.dir !== 'stop') text = 'Moving ' + a.dir;
   else if (a.target !== 'stop') text = 'Reversing → ' + a.target;
-  else if (a.reason === 'limit') text = `Stopped at ${a.atLimit} limit`;
-  else if (a.reason === 'timeout') text = 'Stopped · max run time';
+  else if (a.reason === 'travel') text = 'Stopped · end of travel';
+  else if (a.reason === 'timeout') text = 'Stopped · max swing (not homed)';
+  else if (a.reason === 'homed') text = 'Centered';
+  else if (a.reason === 'homeFailed') text = 'Center not found';
   else text = 'Stopped';
   $('#animState').textContent = text;
+  const side = a.pos < 0 ? 'left' : 'right', off = Math.abs(a.pos) / 1000;
+  $('#animPos').textContent = a.home === 'ok' ? (off < 0.05 ? 'At center' : `${off.toFixed(1)} s ${side} of center`)
+    : a.home === 'searching' ? 'Swinging wider until the center switch closes'
+    : a.home === 'failed' ? 'Not homed · center switch not found, check the switch and wiring'
+    : 'Not homed · moves stop after the max swing time';
   $$('.arrow[data-motor]').forEach(b => {
     const d = b.dataset.motor;
     if (d === 'stop') return;
@@ -977,8 +1034,7 @@ function renderAnim() {
     b.classList.toggle('pending', a.dir !== d && a.target === d);
     b.classList.toggle('blocked', a.atLimit === d && !a.override);
   });
-  setBadge($('#animLimit'), a.override ? 'warn' : a.limit ? 'live' : '',
-    (a.override ? 'overridden' : a.limit ? 'hit' : 'clear') + ' · contact ' + (a.closed ? 'closed' : 'open'));
+  setBadge($('#animCenter'), a.center ? 'live' : '', 'contact ' + (a.closed ? 'closed' : 'open'));
   $('#eyesToggle').checked = a.eyes;
   $('#overrideToggle').checked = a.override;
 }
@@ -1045,6 +1101,9 @@ $$('.arrow[data-motor]').forEach(b => b.addEventListener('click', () => {
 $('#eyesToggle').addEventListener('change', e => {
   api('/api/anim', { eyes: e.target.checked }).catch(err => toast(err.message, true));
 });
+$('#homeBtn').addEventListener('click', () => {
+  api('/api/anim', { home: true }).catch(err => toast(err.message, true));
+});
 $('#overrideToggle').addEventListener('change', e => {
   api('/api/anim', { override: e.target.checked }).catch(err => toast(err.message, true));
 });
@@ -1092,7 +1151,7 @@ function renderSfx() {
   const s = st.sfx;
   $('#sfxCard').hidden = !s;
   if (!s) return;
-  const usb = { connected: ['live', s.device], waiting: ['warn', 'not connected'], unsupported: ['bad', 'unsupported'], off: ['', 'off'] }[s.usb] || ['', s.usb];
+  const usb = { connected: ['live', s.device], waiting: ['warn', 'not connected'], unsupported: ['bad', 'unsupported'], error: ['bad', 'error, see Log'], off: ['', 'off'] }[s.usb] || ['', s.usb];
   setBadge($('#usbBadge'), usb[0], usb[1]);
   $$('.sfx-row').forEach((row, i) => {
     const slot = s.slots[i], playing = !!(s.playing >> i & 1), busy = sfxBusy[i];
@@ -1217,11 +1276,15 @@ $('#usbAudio').addEventListener('change', async e => {
   }
 });
 
-// Keyboard: ← left, → right, ↓ stop, ↑ eyes on/off. Status page only, and never while typing.
+// Keyboard: ← left, → right, ↓ stop, ↑ eyes on/off, H find center. Status page only, and never while typing.
 document.addEventListener('keydown', e => {
   if (!st || !st.anim || !$('#page-status').classList.contains('active')) return;
   if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.target.closest('input, select, textarea')) return;
   const motor = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'stop' }[e.key];
+  if (e.key === 'h' || e.key === 'H') {
+    if (!e.repeat) $('#homeBtn').click();
+    return;
+  }
   if (!motor && e.key !== 'ArrowUp') return;
   e.preventDefault();
   if (e.repeat) return;
@@ -1266,7 +1329,8 @@ async function poll() {
 // levels at up to ~30/s, full status once a second. Polling only covers gaps
 // (stream not up yet, device restarting, or a browser without EventSource).
 const SRC = [undefined, 'dmx', 'artnet', 'manual', 'hold', 'anim'];
-const DIRS = ['stop', 'left', 'right'], REASONS = [undefined, 'user', 'limit', 'timeout', 'input'];
+const DIRS = ['stop', 'left', 'right'], REASONS = [undefined, 'user', 'travel', 'timeout', 'input', 'homed', 'homeFailed'];
+const HOMES = ['none', 'searching', 'ok', 'failed'];
 let events = null, lastEvent = 0, liveFrame = 0;
 
 function applyLive(l) {
@@ -1282,14 +1346,16 @@ function applyLive(l) {
   if (l.id) st.inputs = { dmx: l.id, art: l.ia };
   if (l.sx && st.sfx) [st.sfx.playing, st.sfx.volume, st.sfx.volumeFromInput] = l.sx;
   if (l.an) {
-    const [dir, target, atLimit, reason, limit, closed, override, eyes] = l.an;
-    st.anim = { dir: DIRS[dir], target: DIRS[target], atLimit: DIRS[atLimit], reason: REASONS[reason], limit, closed, override, eyes };
+    const [dir, target, atLimit, reason, center, closed, override, eyes, home, pos] = l.an;
+    st.anim = { dir: DIRS[dir], target: DIRS[target], atLimit: DIRS[atLimit], reason: REASONS[reason], center, closed, override, eyes, home: HOMES[home], pos };
   }
 }
 
 function openEvents() {
   if (!window.EventSource || events) return;
   events = new EventSource('/api/events');
+  events.addEventListener('open', loadLog);  // catch up on anything missed while disconnected
+  events.addEventListener('log', e => addLog(JSON.parse(e.data), true));
   events.addEventListener('status', e => {
     st = JSON.parse(e.data);
     lastEvent = Date.now();
@@ -1518,8 +1584,8 @@ function fillMapping() {
   setSeg($('#loss'), cfg.relays.loss);
   $('#lossTimeout').value = cfg.relays.lossTimeout;
   $('#reverseDelay').value = cfg.anim.reverseDelay;
-  $('#limitIgnore').value = cfg.anim.limitIgnore;
-  $('#maxRun').value = cfg.anim.maxRun;
+  $('#maxSwing').value = cfg.anim.maxSwing;
+  $('#homeOnBoot').checked = cfg.anim.homeOnBoot;
   setSeg($('#limitType'), cfg.anim.limitType);
   $('#animSwap').checked = cfg.anim.swap;
   setSeg($('#motorMode'), cfg.anim.motorMode);
@@ -1577,8 +1643,8 @@ $('#mapSave').addEventListener('click', async () => {
     },
     anim: {
       reverseDelay: clampInt($('#reverseDelay').value, 0, 10000, 500),
-      limitIgnore: clampInt($('#limitIgnore').value, 0, 10000, 300),
-      maxRun: clampInt($('#maxRun').value, 0, 3600, 30),
+      maxSwing: clampInt($('#maxSwing').value, 100, 30000, 2500),
+      homeOnBoot: $('#homeOnBoot').checked,
       limitType: segValue($('#limitType')),
       swap: $('#animSwap').checked,
       motorMode: single ? 'single' : 'dual',
@@ -1806,6 +1872,88 @@ $('#fwUpload').addEventListener('click', () => {
   xhr.send(fd);
 });
 
+// ─── LOG PAGE ──────────────────────────────────────────────
+// The device keeps the last few hundred lines; the page keeps what it has seen
+// (until the device restarts) and gets new lines live over the event stream.
+const LOG_KEEP = 1000, LOG_LEVELS = { E: 'error', W: 'warn', I: 'info' };
+let logEntries = [], logSeq = 0, logBoot = 0, logOffset = 0, logLoading = false;
+
+async function loadLog() {
+  if (logLoading) return;
+  logLoading = true;
+  try {
+    addLog(await api('/api/log' + (logSeq ? '?after=' + logSeq : '')), false);
+  } catch (e) { /* offline: the next status poll shows it */ }
+  logLoading = false;
+}
+
+function addLog(j, live) {
+  logOffset = Date.now() - j.now;
+  // The boot time moves when the device restarts; its sequence numbers start over.
+  if (Math.abs(logOffset - logBoot) > 5000 || j.seq < logSeq) {
+    if (logBoot) { logEntries = []; logSeq = 0; }
+    logBoot = logOffset;
+    if (live) return loadLog();
+  }
+  const fresh = j.entries.filter(e => e.n > logSeq);
+  if (live && fresh.length && fresh[0].n > logSeq + 1) return loadLog();  // missed some lines
+  if (!fresh.length) return;
+  logEntries.push(...fresh);
+  if (logEntries.length > LOG_KEEP) logEntries.splice(0, logEntries.length - LOG_KEEP);
+  logSeq = fresh[fresh.length - 1].n;
+  if (document.body.dataset.tab === 'log') renderLog();
+}
+
+function logTime(e) {
+  return new Date(logOffset + e.t).toLocaleTimeString([], { hour12: false });
+}
+
+function renderLog() {
+  const filter = segValue($('#logFilter'));
+  const shown = logEntries.filter(e => filter === 'all' || e.l === 'E' || (filter === 'warn' && e.l === 'W'));
+  const errors = logEntries.filter(e => e.l === 'E').length, warns = logEntries.filter(e => e.l === 'W').length;
+  $('#logCount').textContent = `${logEntries.length} events` + (errors ? ` · ${errors} errors` : '') + (warns ? ` · ${warns} warnings` : '');
+  const list = $('#logList');
+  if (!shown.length) {
+    const d = document.createElement('div');
+    d.className = 'log-empty';
+    d.textContent = logEntries.length ? 'Nothing at this level.' : 'No events yet.';
+    list.replaceChildren(d);
+    return;
+  }
+  list.replaceChildren(...shown.slice().reverse().map(e => {
+    const row = document.createElement('div');
+    row.className = 'log-row ' + LOG_LEVELS[e.l];
+    row.title = `#${e.n} · ${(e.t / 1000).toFixed(3)} s after start`;
+    for (const [cls, text] of [['log-time', logTime(e)], ['log-lvl', LOG_LEVELS[e.l]], ['log-tag', e.g], ['log-msg', e.m]]) {
+      const c = document.createElement('span');
+      c.className = cls;
+      c.textContent = text;
+      row.append(c);
+    }
+    return row;
+  }));
+}
+
+$('#logFilter').addEventListener('change', renderLog);
+$('#logSave').addEventListener('click', () => {
+  const lines = logEntries.map(e => `${logTime(e)}  ${(e.t / 1000).toFixed(3).padStart(10)}  ${LOG_LEVELS[e.l].toUpperCase().padEnd(5)}  [${e.g}] ${e.m}`);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/plain' }));
+  a.download = `${st?.hostname || 'device'}-log.txt`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$('#logClear').addEventListener('click', async () => {
+  try {
+    await api('/api/log', { clear: true });
+    logEntries = [];
+    renderLog();
+  } catch (e) {
+    toast(e.message, true);
+  }
+});
+
 // ─── BOOT ──────────────────────────────────────────────────
 async function loadConfig() {
   try {
@@ -1824,6 +1972,7 @@ buildChan();
 buildSfx();
 showTab(location.hash.slice(1) || 'status');
 loadConfig().then(startLive);
+loadLog();
 </script>
 </body>
 </html>

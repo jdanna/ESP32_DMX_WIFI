@@ -1,6 +1,7 @@
 #include "config.h"
 
 #include <Preferences.h>
+#include "log.h"
 
 Config g_cfg;
 
@@ -147,8 +148,8 @@ void configToJson(const Config &cfg, JsonObject out, bool includeSecrets) {
 
   JsonObject an = out["anim"].to<JsonObject>();
   an["reverseDelay"] = cfg.io.anim.reverseDelayMs;
-  an["limitIgnore"] = cfg.io.anim.limitIgnoreMs;
-  an["maxRun"] = cfg.io.anim.maxRunS;
+  an["maxSwing"] = cfg.io.anim.maxSwingMs;
+  an["homeOnBoot"] = cfg.io.anim.homeOnBoot;
   an["limitType"] = cfg.io.anim.limitNc ? "nc" : "no";
   an["swap"] = cfg.io.anim.swap;
   JsonArray fnMap = an["map"].to<JsonArray>();
@@ -277,14 +278,13 @@ bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkC
   if (!an.isNull()) {
     if (readRanged(an["reverseDelay"], 0, 10000, n, "Reverse delay", err)) c.io.anim.reverseDelayMs = n;
     if (err.length()) return false;
-    if (readRanged(an["limitIgnore"], 0, 10000, n, "Limit ignore time", err)) c.io.anim.limitIgnoreMs = n;
+    if (readRanged(an["maxSwing"], 100, 30000, n, "Max swing", err)) c.io.anim.maxSwingMs = n;
     if (err.length()) return false;
-    if (readRanged(an["maxRun"], 0, 3600, n, "Max run time", err)) c.io.anim.maxRunS = n;
-    if (err.length()) return false;
+    if (an["homeOnBoot"].is<bool>()) c.io.anim.homeOnBoot = an["homeOnBoot"];
     if (!an["limitType"].isNull()) {
       const char *t = an["limitType"];
       if (!t || (strcmp(t, "no") && strcmp(t, "nc"))) {
-        err = "Limit switch type must be no or nc";
+        err = "Center switch type must be no or nc";
         return false;
       }
       c.io.anim.limitNc = strcmp(t, "nc") == 0;
@@ -401,13 +401,13 @@ void configLoad(Config &cfg) {
 
   JsonDocument doc;
   if (deserializeJson(doc, raw)) {
-    log_w("Stored config is corrupt, using defaults");
+    logWarn("cfg", "Stored config is corrupt, using defaults");
     return;
   }
   String err;
   bool changed;
   if (!configFromJson(cfg, doc.as<JsonObjectConst>(), err, changed)) {
-    log_w("Stored config rejected (%s), using defaults", err.c_str());
+    logWarn("cfg", "Stored config rejected (%s), using defaults", err.c_str());
     configDefaults(cfg);
     return;
   }
@@ -430,6 +430,9 @@ void configSave(const Config &cfg) {
 void configErase() {
   Preferences prefs;
   prefs.begin(NVS_NS, false);
+  prefs.clear();
+  prefs.end();
+  prefs.begin("anim", false);  // animatronic's saved head position
   prefs.clear();
   prefs.end();
 }

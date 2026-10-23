@@ -4,6 +4,7 @@
 #include <LittleFS.h>
 #include "usb/uac_host.h"
 #include "usb/usb_host.h"
+#include "log.h"
 
 namespace {
 
@@ -12,10 +13,12 @@ constexpr uint32_t CHUNK_DIV = 100;          // mix 10 ms at a time
 constexpr uint32_t UAC_BUFFER = 19200;       // ~100 ms of 48 kHz stereo in the driver's ring buffer
 constexpr uint32_t UAC_THRESHOLD = 4800;
 constexpr uint32_t PREFERRED_RATES[] = {48000, 44100, 32000, 24000, 22050, 16000};
+constexpr uint32_t NO_DEVICE_HINT_MS = 15000;  // nothing enumerated this long after start -> log a hint
+constexpr uint32_t ERROR_LOG_EVERY_MS = 5000;   // rate limit for repeating stream errors
 const char *UPLOAD_PATH = "/sfx_upload.wav";
 
-enum UsbState : uint8_t { USB_OFF, USB_WAITING, USB_CONNECTED, USB_UNSUPPORTED };
-const char *USB_STATE_NAMES[] = {"off", "waiting", "connected", "unsupported"};
+enum UsbState : uint8_t { USB_OFF, USB_WAITING, USB_CONNECTED, USB_UNSUPPORTED, USB_ERROR };
+const char *USB_STATE_NAMES[] = {"off", "waiting", "connected", "unsupported", "error"};
 
 struct Sound {
   int16_t *pcm;  // mono, in PSRAM
@@ -45,6 +48,8 @@ uint8_t outCh;
 char deviceDesc[48];
 QueueHandle_t usbEvents;
 TaskHandle_t mixerHandle, uacHandle;
+volatile bool usbDeviceSeen;
+volatile uint32_t xferErrors;  // isochronous transfer failures since the speaker connected
 
 String slotPath(int slot) { return String("/sfx") + (slot + 1) + ".wav"; }
 
@@ -180,9 +185,21 @@ void mixerTask(void *) {
 
     esp_err_t err = ESP_FAIL;
     xSemaphoreTake(spkLock, portMAX_DELAY);
+    const bool open = spk;
     if (spk) err = uac_host_device_write(spk, (uint8_t *)out, frames * outCh * 2, pdMS_TO_TICKS(200));
     xSemaphoreGive(spkLock);
-    if (err != ESP_OK) vTaskDelay(pdMS_TO_TICKS(10));
+    if (err != ESP_OK) {
+      // A timeout means the speaker isn't consuming audio: the driver's buffer stays full.
+      static uint32_t lastLog, failures;
+      failures++;
+      if (open && millis() - lastLog >= ERROR_LOG_EVERY_MS) {
+        logWarn("sfx", "USB speaker isn't taking audio (%s, %lu failed writes)", esp_err_to_name(err),
+                (unsigned long)failures);
+        lastLog = millis();
+        failures = 0;
+      }
+      vTaskDelay(pdMS_TO_TICKS(10));
+    }
   }
 }
 
@@ -201,8 +218,19 @@ void onDriverEvent(uint8_t addr, uint8_t iface, const uac_host_driver_event_t ev
 }
 
 void onDeviceEvent(uac_host_device_handle_t handle, const uac_host_device_event_t event, void *) {
+  if (event == UAC_HOST_DEVICE_EVENT_TRANSFER_ERROR) xferErrors = xferErrors + 1;  // only this task writes it
+  // TX_DONE fires on nearly every transfer; queueing it could crowd out a disconnect.
+  if (event != UAC_HOST_DRIVER_EVENT_DISCONNECTED) return;
   UsbEvent e = {true, 0, 0, event, handle};
-  xQueueSend(usbEvents, &e, 0);
+  xQueueSend(usbEvents, &e, pdMS_TO_TICKS(100));
+}
+
+// Runs for every device the host enumerates, audio or not.
+bool onEnumerate(const usb_device_desc_t *d, uint8_t *) {
+  usbDeviceSeen = true;
+  logInfo("usb", "Device %04X:%04X connected (USB %x.%02x, class %u)", d->idVendor, d->idProduct, d->bcdUSB >> 8,
+          d->bcdUSB & 0xff, d->bDeviceClass);
+  return true;
 }
 
 bool supportsRate(const uac_host_dev_alt_param_t &p, uint32_t rate) {
@@ -213,9 +241,7 @@ bool supportsRate(const uac_host_dev_alt_param_t &p, uint32_t rate) {
 }
 
 // Picks a 16-bit format, preferring stereo at the most common rates.
-bool pickFormat(uac_host_device_handle_t h, uint8_t &channels, uint32_t &rate) {
-  uac_host_dev_info_t info;
-  if (uac_host_get_device_info(h, &info) != ESP_OK) return false;
+bool pickFormat(uac_host_device_handle_t h, const uac_host_dev_info_t &info, uint8_t &channels, uint32_t &rate) {
   for (uint32_t want : PREFERRED_RATES) {
     for (int stereo = 1; stereo >= 0; stereo--) {
       for (uint8_t alt = 1; alt <= info.iface_alt_num; alt++) {
@@ -232,8 +258,28 @@ bool pickFormat(uac_host_device_handle_t h, uint8_t &channels, uint32_t &rate) {
   return false;
 }
 
+void logFormats(uac_host_device_handle_t h, const uac_host_dev_info_t &info) {
+  for (uint8_t alt = 1; alt <= info.iface_alt_num; alt++) {
+    uac_host_dev_alt_param_t p;
+    if (uac_host_get_device_alt_param(h, alt, &p) != ESP_OK) continue;
+    char rates[48] = "";
+    if (p.sample_freq_type == 0) {
+      snprintf(rates, sizeof(rates), "%lu-%lu Hz", (unsigned long)p.sample_freq_lower, (unsigned long)p.sample_freq_upper);
+    } else {
+      for (int i = 0; i < p.sample_freq_type && i < UAC_FREQ_NUM_MAX; i++)
+        snprintf(rates + strlen(rates), sizeof(rates) - strlen(rates), "%s%lu", i ? "/" : "", (unsigned long)p.sample_freq[i]);
+      strlcat(rates, " Hz", sizeof(rates));
+    }
+    logInfo("sfx", "  format %u: %u ch, %u-bit (%u-byte), %s, tag %u", alt, p.channels, p.bit_resolution,
+            p.subframe_size, rates, p.format);
+  }
+}
+
 void openSpeaker(uint8_t addr, uint8_t iface) {
-  if (spk) return;  // one speaker at a time
+  if (spk) {
+    logWarn("sfx", "Ignoring a second USB speaker (address %u)", addr);
+    return;
+  }
   const uac_host_device_config_t cfg = {
       .addr = addr,
       .iface_num = iface,
@@ -243,12 +289,27 @@ void openSpeaker(uint8_t addr, uint8_t iface) {
       .callback_arg = nullptr,
   };
   uac_host_device_handle_t h;
-  if (uac_host_device_open(&cfg, &h) != ESP_OK) return;
+  esp_err_t err = uac_host_device_open(&cfg, &h);
+  if (err != ESP_OK) {
+    logError("sfx", "Couldn't open the USB speaker: %s", esp_err_to_name(err));
+    usbState = USB_ERROR;
+    return;
+  }
+
+  uac_host_dev_info_t info = {};
+  uac_host_get_device_info(h, &info);
+  char product[32];
+  size_t n = 0;
+  for (; n < sizeof(product) - 1 && info.iProduct[n]; n++) product[n] = info.iProduct[n] < 0x80 ? info.iProduct[n] : '?';
+  product[n] = 0;
+  logInfo("sfx", "USB speaker \"%s\" (%04X:%04X), interface %u, %u format(s)", product, info.VID, info.PID, iface,
+          info.iface_alt_num);
+  logFormats(h, info);
 
   uint8_t channels;
   uint32_t rate;
-  if (!pickFormat(h, channels, rate)) {
-    log_w("USB speaker has no 16-bit PCM format");
+  if (!pickFormat(h, info, channels, rate)) {
+    logError("sfx", "USB speaker has no 16-bit PCM format at a supported rate");
     usbState = USB_UNSUPPORTED;
     uac_host_device_close(h);
     return;
@@ -259,25 +320,44 @@ void openSpeaker(uint8_t addr, uint8_t iface) {
       .sample_freq = rate,
       .flags = 0,
   };
-  if (uac_host_device_start(h, &stream) != ESP_OK) {
-    log_w("USB speaker didn't start");
-    usbState = USB_UNSUPPORTED;
+  err = uac_host_device_start(h, &stream);
+  if (err != ESP_OK) {
+    logError("sfx", "USB speaker didn't start at %lu Hz %u ch: %s", (unsigned long)rate, channels, esp_err_to_name(err));
+    usbState = USB_ERROR;
     uac_host_device_close(h);
     return;
   }
+
   // Volume is applied in the mixer, so run the speaker's own control flat out.
-  uac_host_device_set_mute(h, false);
-  uac_host_device_set_volume(h, 100);
+  // If the device didn't report a usable volume range the driver can compute a
+  // bogus level (silence), so check the result and put the old level back.
+  err = uac_host_device_set_mute(h, false);
+  if (err != ESP_OK && err != ESP_ERR_NOT_SUPPORTED) logWarn("sfx", "Unmute failed: %s", esp_err_to_name(err));
+  int16_t before, after;
+  if (uac_host_device_get_volume_db(h, &before) == ESP_OK) {
+    err = uac_host_device_set_volume(h, 100);
+    if (err != ESP_OK) {
+      logWarn("sfx", "Setting speaker volume failed: %s", esp_err_to_name(err));
+    } else if (uac_host_device_get_volume_db(h, &after) == ESP_OK) {
+      if (after < before) {
+        logWarn("sfx", "Speaker got quieter at 100%% (%.1f -> %.1f dB), restoring", before / 256.0f, after / 256.0f);
+        uac_host_device_set_volume_db(h, before);
+      } else {
+        logInfo("sfx", "Speaker volume %.1f dB", after / 256.0f);
+      }
+    }
+  }
 
   outRate = rate;
   outCh = channels;
   snprintf(deviceDesc, sizeof(deviceDesc), "%lu Hz %s", (unsigned long)rate, channels == 2 ? "stereo" : "mono");
+  xferErrors = 0;
   xSemaphoreTake(spkLock, portMAX_DELAY);
   spk = h;
   xSemaphoreGive(spkLock);
   usbState = USB_CONNECTED;
   xTaskNotifyGive(mixerHandle);
-  Serial.printf("[sfx] USB speaker connected, %s\n", deviceDesc);
+  logInfo("sfx", "USB speaker connected, %s", deviceDesc);
 }
 
 void closeSpeaker(uac_host_device_handle_t h) {
@@ -289,6 +369,7 @@ void closeSpeaker(uac_host_device_handle_t h) {
   if (ours) {
     usbState = USB_WAITING;
     deviceDesc[0] = 0;
+    logInfo("sfx", "USB speaker disconnected");
   }
 }
 
@@ -296,16 +377,21 @@ void usbHostTask(void *) {
   const usb_host_config_t cfg = {
       .skip_phy_setup = false,
       .intr_flags = ESP_INTR_FLAG_LOWMED,
+      .enum_filter_cb = onEnumerate,
   };
-  if (usb_host_install(&cfg) != ESP_OK) {
-    log_e("USB host install failed");
+  const esp_err_t err = usb_host_install(&cfg);
+  if (err != ESP_OK) {
+    logError("usb", "USB host install failed: %s", esp_err_to_name(err));
+    usbState = USB_ERROR;
     vTaskDelete(nullptr);
   }
+  logInfo("usb", "USB-C port is now a USB host (serial monitor disabled)");
   xTaskNotifyGive(uacHandle);
   for (;;) {
     uint32_t flags;
     usb_host_lib_handle_events(portMAX_DELAY, &flags);
     if (flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) usb_host_device_free_all();
+    if (flags & USB_HOST_LIB_EVENT_FLAGS_ALL_FREE) logInfo("usb", "All USB devices removed");
   }
 }
 
@@ -319,16 +405,41 @@ void uacTask(void *) {
       .callback = onDriverEvent,
       .callback_arg = nullptr,
   };
-  if (uac_host_install(&cfg) != ESP_OK) {
-    log_e("UAC driver install failed");
+  const esp_err_t err = uac_host_install(&cfg);
+  if (err != ESP_OK) {
+    logError("sfx", "USB audio driver install failed: %s", esp_err_to_name(err));
+    usbState = USB_ERROR;
     vTaskDelete(nullptr);
   }
+  // Let the driver's warnings and info (e.g. "not UAC device") reach the Log page;
+  // library.json compiles them in.
+  esp_log_level_set("uac-host", ESP_LOG_INFO);
   usbState = USB_WAITING;
+  logInfo("sfx", "Waiting for a USB speaker");
+  const uint32_t started = millis();
+  bool hinted = false;
+  uint32_t errorsLogged = 0, lastErrorLog = 0;
   UsbEvent e;
   for (;;) {
-    if (!xQueueReceive(usbEvents, &e, portMAX_DELAY)) continue;
-    if (!e.device && e.event == UAC_HOST_DRIVER_EVENT_TX_CONNECTED) openSpeaker(e.addr, e.iface);
-    else if (e.device && e.event == UAC_HOST_DRIVER_EVENT_DISCONNECTED) closeSpeaker(e.handle);
+    if (xQueueReceive(usbEvents, &e, pdMS_TO_TICKS(1000))) {
+      if (!e.device && e.event == UAC_HOST_DRIVER_EVENT_TX_CONNECTED) openSpeaker(e.addr, e.iface);
+      else if (!e.device && e.event == UAC_HOST_DRIVER_EVENT_RX_CONNECTED)
+        logInfo("sfx", "Ignoring a USB microphone interface (address %u)", e.addr);
+      else if (e.device && e.event == UAC_HOST_DRIVER_EVENT_DISCONNECTED) closeSpeaker(e.handle);
+    }
+    if (!hinted && !usbDeviceSeen && millis() - started > NO_DEVICE_HINT_MS) {
+      hinted = true;
+      // The port has no 5 V output: a bus-powered speaker stays off, and a hub won't
+      // attach either, since hubs only connect upstream when they see 5 V from the host.
+      logWarn("usb", "No USB device detected on the USB-C port. This board doesn't put 5 V on the port, so the "
+                     "speaker needs 5 V injected on VBUS (a powered OTG adapter); a powered hub isn't enough.");
+    }
+    const uint32_t errors = xferErrors;
+    if (errors != errorsLogged && millis() - lastErrorLog >= ERROR_LOG_EVERY_MS) {
+      logWarn("sfx", "USB audio transfer errors: %lu", (unsigned long)(errors - errorsLogged));
+      errorsLogged = errors;
+      lastErrorLog = millis();
+    }
   }
 }
 
@@ -337,14 +448,19 @@ void uacTask(void *) {
 void sfxBegin(bool usbAudio) {
   lock = xSemaphoreCreateMutex();
   spkLock = xSemaphoreCreateMutex();
-  if (!LittleFS.begin(true)) log_e("LittleFS mount failed");
+  if (!LittleFS.begin(true)) logError("sfx", "LittleFS mount failed");
   for (int i = 0; i < SFX_COUNT; i++) {
     Sound s;
     String err;
-    if (LittleFS.exists(slotPath(i)) && loadWav(slotPath(i), s, err)) sounds[i] = s;
+    if (!LittleFS.exists(slotPath(i))) continue;
+    if (loadWav(slotPath(i), s, err)) sounds[i] = s;
+    else logError("sfx", "Sound %d couldn't be loaded: %s", i + 1, err.c_str());
   }
   xTaskCreatePinnedToCore(mixerTask, "sfx_mix", 4096, nullptr, 6, &mixerHandle, 0);
-  if (!usbAudio) return;
+  if (!usbAudio) {
+    logInfo("sfx", "USB audio is off (System page)");
+    return;
+  }
   usbEvents = xQueueCreate(10, sizeof(UsbEvent));
   xTaskCreatePinnedToCore(uacTask, "uac_events", 4096, nullptr, 2, &uacHandle, 0);
   xTaskCreatePinnedToCore(usbHostTask, "usb_host", 4096, nullptr, 5, nullptr, 0);

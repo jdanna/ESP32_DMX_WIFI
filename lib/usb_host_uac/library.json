@@ -9,7 +9,8 @@
     "flags": [
       "-DUSB_HOST_UAC_VER_MAJOR=1",
       "-DUSB_HOST_UAC_VER_MINOR=5",
-      "-DUSB_HOST_UAC_VER_PATCH=0"
+      "-DUSB_HOST_UAC_VER_PATCH=0",
+      "-DLOG_LOCAL_LEVEL=3"
     ]
   }
 }

@@ -2,6 +2,7 @@
 
 #include <NetworkUdp.h>
 #include "dmx_rx.h"
+#include "log.h"
 #include "net.h"
 #include "relays.h"
 
@@ -319,7 +320,7 @@ void engineTask(void *) {
 void engineBegin(const IoSettings &settings) {
   io = settings;
   expanderOk = relaysBegin();
-  if (!expanderOk) log_e("TCA9554 relay expander not responding");
+  if (!expanderOk) logError("relay", "TCA9554 relay expander not responding");
 #ifdef ANIMATRONIC
   animBegin();
 #endif

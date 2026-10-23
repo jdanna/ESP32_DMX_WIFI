@@ -4,6 +4,7 @@
 #include <ESPmDNS.h>
 #include <ETH.h>
 #include <WiFi.h>
+#include "log.h"
 
 namespace {
 
@@ -23,19 +24,19 @@ uint32_t downSince, upSince, lastStaTry;
 void onEvent(arduino_event_id_t event, arduino_event_info_t) {
   switch (event) {
     case ARDUINO_EVENT_ETH_CONNECTED:
-      Serial.println("[net] Ethernet link up");
+      logInfo("net", "Ethernet link up");
       break;
     case ARDUINO_EVENT_ETH_DISCONNECTED:
-      Serial.println("[net] Ethernet link down");
+      logWarn("net", "Ethernet link down");
       break;
     case ARDUINO_EVENT_ETH_GOT_IP:
-      Serial.printf("[net] Ethernet IP %s\n", ETH.localIP().toString().c_str());
+      logInfo("net", "Ethernet IP %s", ETH.localIP().toString().c_str());
       break;
     case ARDUINO_EVENT_WIFI_STA_GOT_IP:
-      Serial.printf("[net] Wi-Fi IP %s\n", WiFi.localIP().toString().c_str());
+      logInfo("net", "Wi-Fi IP %s", WiFi.localIP().toString().c_str());
       break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-      Serial.println("[net] Wi-Fi disconnected");
+      logWarn("net", "Wi-Fi disconnected");
       break;
     default:
       break;
@@ -53,8 +54,8 @@ String macStr(const uint8_t mac[6]) {
 }
 
 void startAp() {
-  Serial.printf("[net] No network - starting setup AP \"%s\" (password %s) at %s\n", apSsid, AP_PASS,
-                AP_IP.toString().c_str());
+  logWarn("net", "No network - starting setup AP \"%s\" (password %s) at %s", apSsid, AP_PASS,
+          AP_IP.toString().c_str());
   // A station that keeps scanning for a missing network hops channels and makes the
   // AP unusable, so retries are paced manually while the AP is up.
   WiFi.setAutoReconnect(false);
@@ -67,7 +68,7 @@ void startAp() {
 }
 
 void stopAp() {
-  Serial.println("[net] Network is up - closing setup AP");
+  logInfo("net", "Network is up - closing setup AP");
   dns.stop();
   WiFi.softAPdisconnect(true);
   WiFi.mode(staConfigured ? WIFI_STA : WIFI_OFF);
@@ -93,7 +94,7 @@ void netBegin(const Config &cfg) {
 
   if (!ETH.begin(ETH_PHY_W5500, 1, PIN_ETH_CS, PIN_ETH_INT, PIN_ETH_RST, SPI3_HOST, PIN_ETH_SCK, PIN_ETH_MISO,
                  PIN_ETH_MOSI)) {
-    Serial.println("[net] W5500 Ethernet failed to start");
+    logError("net", "W5500 Ethernet failed to start");
   } else if (!cfg.eth.dhcp) {
     ETH.config(cfg.eth.ip, cfg.eth.gw, cfg.eth.mask, cfg.eth.dns);
   }

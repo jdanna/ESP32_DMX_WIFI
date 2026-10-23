@@ -8,6 +8,7 @@
 #include <lwip/sockets.h>
 #include "config.h"
 #include "engine.h"
+#include "log.h"
 #include "net.h"
 #include "web_index.h"
 #ifdef ANIMATRONIC
@@ -27,6 +28,7 @@ constexpr int MAX_EVENT_CLIENTS = 4;
 constexpr uint32_t LIVE_INTERVAL_MS = 33;   // level/fps updates: at most ~30/s, only on change
 constexpr uint32_t FULL_INTERVAL_MS = 1000; // full status (network, counters)
 constexpr uint32_t STALL_DROP_MS = 5000;    // drop a client that can't take data this long
+constexpr int LOG_EVENT_MAX = 40;           // log lines per event; a client that falls behind refetches
 
 struct EventClient {
   NetworkClient client;
@@ -37,6 +39,7 @@ EventClient eventClients[MAX_EVENT_CLIENTS];
 String lastLive;
 uint8_t lastMask;
 bool lastManual, forceEvents;
+uint32_t lastLogSeq;
 uint32_t lastLiveMs, lastFullMs;
 
 void sendJson(int code, const JsonDocument &doc) {
@@ -120,10 +123,12 @@ void buildStatus(JsonObject root) {
   an["target"] = motorDirName(st.anim.target);
   an["atLimit"] = motorDirName(st.anim.atLimit);
   if (stopReasonName(st.anim.reason)) an["reason"] = stopReasonName(st.anim.reason);
-  an["limit"] = st.anim.limit;
+  an["center"] = st.anim.center;
   an["closed"] = st.anim.closed;
   an["override"] = st.anim.override;
   an["eyes"] = st.anim.eyes;
+  an["home"] = homeStateName(st.anim.home);
+  an["pos"] = st.anim.posMs;
 
   JsonObject sx = root["sfx"].to<JsonObject>();
   sfxStatusJson(sx);
@@ -158,16 +163,18 @@ String liveJson(const EngineStatus &st) {
     ia.add(st.inArt[i]);
   }
 #ifdef ANIMATRONIC
-  // [dir, target, atLimit, reason, limit, closed, override, eyes]
+  // [dir, target, atLimit, reason, center, closed, override, eyes, home, position ms]
   JsonArray an = doc["an"].to<JsonArray>();
   an.add((int)st.anim.dir);
   an.add((int)st.anim.target);
   an.add((int)st.anim.atLimit);
   an.add((int)st.anim.reason);
-  an.add(st.anim.limit);
+  an.add(st.anim.center);
   an.add(st.anim.closed);
   an.add(st.anim.override);
   an.add(st.anim.eyes);
+  an.add((int)st.anim.home);
+  an.add(st.anim.posMs);
   // [playing mask, volume %, volume set by an input]
   JsonArray sx = doc["sx"].to<JsonArray>();
   sx.add(sfxPlayingMask());
@@ -226,6 +233,18 @@ void pushEvents() {
     lastFullMs = now;
   }
 
+  const uint32_t seq = logSeq();
+  if (seq != lastLogSeq) {
+    JsonDocument doc;
+    logJson(doc["entries"].to<JsonArray>(), lastLogSeq, LOG_EVENT_MAX);
+    doc["seq"] = seq;
+    doc["now"] = now;
+    String json;
+    serializeJson(doc, json);
+    broadcast("log", json);
+    lastLogSeq = seq;
+  }
+
   const EngineStatus st = engineStatus();
   const bool relaysChanged = st.relayMask != lastMask || st.manual != lastManual;
   if (!force && !relaysChanged && now - lastLiveMs < LIVE_INTERVAL_MS) return;
@@ -262,6 +281,24 @@ void handleEvents() {
   ec.since = millis();
   ec.stalledSince = 0;
   forceEvents = true;
+}
+
+// ?after=N returns only entries newer than sequence number N.
+void handleGetLog() {
+  JsonDocument doc;
+  doc["seq"] = logSeq();
+  doc["now"] = millis();
+  logJson(doc["entries"].to<JsonArray>(), server.arg("after").toInt(), 1000);
+  sendJson(200, doc);
+}
+
+void handlePostLog() {
+  JsonDocument in;
+  if (!readBody(in)) return;
+  if (in["clear"] == true) logClear();
+  JsonDocument doc;
+  doc["ok"] = true;
+  sendJson(200, doc);
 }
 
 void handleGetConfig() {
@@ -320,6 +357,7 @@ void handleAnim() {
   if (!readBody(in)) return;
   if (in["override"].is<bool>()) animOverride(in["override"]);
   if (in["eyes"].is<bool>()) animEyes(in["eyes"]);
+  if (in["home"] == true) animHome();
   if (!in["motor"].isNull()) {
     const char *m = in["motor"];
     MotorDir dir;
@@ -479,15 +517,16 @@ void handleUpdateUpload() {
   HTTPUpload &up = server.upload();
   switch (up.status) {
     case UPLOAD_FILE_START:
-      Serial.printf("[ota] Receiving %s\n", up.filename.c_str());
+      logInfo("ota", "Receiving %s", up.filename.c_str());
       Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH);
       break;
     case UPLOAD_FILE_WRITE:
-      if (!Update.hasError() && Update.write(up.buf, up.currentSize) != up.currentSize) Update.printError(Serial);
+      if (!Update.hasError() && Update.write(up.buf, up.currentSize) != up.currentSize)
+        logError("ota", "Write failed: %s", Update.errorString());
       break;
     case UPLOAD_FILE_END:
-      if (Update.end(true)) Serial.printf("[ota] Update OK, %u bytes\n", up.totalSize);
-      else Update.printError(Serial);
+      if (Update.end(true)) logInfo("ota", "Update OK, %u bytes", up.totalSize);
+      else logError("ota", "Update failed: %s", Update.errorString());
       break;
     case UPLOAD_FILE_ABORTED:
       Update.abort();
@@ -512,6 +551,8 @@ void webBegin() {
   server.on("/", HTTP_GET, handleIndex);
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/events", HTTP_GET, handleEvents);
+  server.on("/api/log", HTTP_GET, handleGetLog);
+  server.on("/api/log", HTTP_POST, handlePostLog);
   server.on("/api/config", HTTP_GET, handleGetConfig);
   server.on("/api/config", HTTP_POST, handlePostConfig);
   server.on("/api/relays", HTTP_POST, handleRelays);
@@ -532,7 +573,7 @@ void webLoop() {
   server.handleClient();
   pushEvents();
   if (rebootAt && (int32_t)(millis() - rebootAt) >= 0) {
-    Serial.println("[sys] Rebooting");
+    logInfo("sys", "Rebooting");
     delay(100);
     ESP.restart();
   }

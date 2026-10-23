@@ -9,6 +9,7 @@
 #include "config.h"
 #include "dmx_rx.h"
 #include "engine.h"
+#include "log.h"
 #include "net.h"
 #include "web.h"
 #ifdef ANIMATRONIC
@@ -46,7 +47,7 @@ static void checkResetButton() {
   if (!pressedAt) pressedAt = millis();
   if (millis() - pressedAt < FACTORY_RESET_HOLD_MS) return;
 
-  Serial.println("[sys] BOOT held - factory reset");
+  logWarn("sys", "BOOT held - factory reset");
   configErase();
   for (int i = 0; i < 6; i++) {
     setLed(i % 2 ? 0 : 60, 0, 0);
@@ -57,11 +58,12 @@ static void checkResetButton() {
 
 void setup() {
   Serial.begin(115200);
+  logBegin();
   pinMode(PIN_BOOT_BTN, INPUT_PULLUP);
   setLed(30, 16, 0);
 
   configLoad(g_cfg);
-  Serial.printf("\n[sys] DMX Relay Node %s (%s) - %s\n", FW_VERSION, FW_VARIANT, g_cfg.hostname);
+  logInfo("sys", "DMX Relay Node %s (%s) - %s", FW_VERSION, FW_VARIANT, g_cfg.hostname);
 
   dmxBegin(PIN_RS485_TX, PIN_RS485_RX);
   netBegin(g_cfg);
@@ -70,7 +72,7 @@ void setup() {
 #endif
   engineBegin(g_cfg.io);
   webBegin();
-  Serial.printf("[sys] Web UI at http://%s.local/\n", g_cfg.hostname);
+  logInfo("sys", "Web UI at http://%s.local/", g_cfg.hostname);
 }
 
 void loop() {
@@ -78,5 +80,8 @@ void loop() {
   netLoop();
   updateLed();
   checkResetButton();
+#ifdef ANIMATRONIC
+  animLoop();
+#endif
   delay(2);
 }
