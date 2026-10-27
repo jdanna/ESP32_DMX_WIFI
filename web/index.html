@@ -579,7 +579,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
         <span class="badge" id="usbBadge"><span class="dot"></span>USB speaker <span class="val"></span></span>
       </div>
       <div class="sfx-list" id="sfxList"></div>
-      <div class="vol-row"><span class="label">Volume</span><input id="volume" type="range" min="0" max="100" aria-label="Volume"><span class="mono" id="volVal"></span></div>
+      <div class="vol-row"><span class="label">Volume</span><input id="volume" type="range" min="0" max="100" aria-label="Volume"><span class="mono" id="volVal"></span><button class="btn btn-secondary btn-sm" type="button" id="toneBtn" title="Three seconds of 440 Hz at a fixed level, ignoring the volume and the sound files">Test tone</button></div>
       <p class="sfx-foot" id="sfxStorage"></p>
     </div>
   </div>
@@ -1301,6 +1301,7 @@ async function uploadSound(i, file) {
   }
 }
 
+$('#toneBtn').addEventListener('click', () => api('/api/sfx', { tone: 1 }).catch(e => toast(e.message, true)));
 $('#volume').addEventListener('input', e => {
   volDragging = true;
   e.target.style.setProperty('--p', e.target.value + '%');

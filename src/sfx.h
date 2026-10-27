@@ -16,6 +16,7 @@ void sfxInput(uint8_t mask, bool enabled, uint8_t volume, bool volumeFromInput);
 
 void sfxPlay(int slot);
 void sfxStop(int slot);  // -1 stops all
+void sfxTone();          // 3 s 440 Hz test tone straight to the speaker, ignoring the volume
 
 // Upload support: the file is written to sfxUploadPath() first, then
 // sfxInstall() checks it, moves it into the slot and loads it.

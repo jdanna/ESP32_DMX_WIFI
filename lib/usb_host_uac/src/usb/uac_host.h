@@ -514,6 +514,21 @@ esp_err_t uac_host_device_set_volume_db(uac_host_device_handle_t uac_dev_handle,
  */
 esp_err_t uac_host_device_get_volume_db(uac_host_device_handle_t uac_dev_handle, int16_t *volume_db);
 
+/**
+ * @brief Send SET_CUR SAMPLING_FREQ_CONTROL to the stream endpoint even if the descriptor
+ * doesn't advertise frequency control (some devices want it anyway; macOS always sends it).
+ * (Local addition, not in the upstream driver.) Call after uac_host_device_start().
+ */
+esp_err_t uac_host_device_set_ep_frequency(uac_host_device_handle_t uac_dev_handle, uint32_t freq);
+
+/**
+ * @brief Diagnostics: isochronous OUT packets completed since the stream started, how many of
+ * those the host reported as skipped, bytes actually sent, and packets with a non-zero payload.
+ * (Local addition, not in the upstream driver.)
+ */
+esp_err_t uac_host_device_get_tx_stats(uac_host_device_handle_t uac_dev_handle, uint32_t *packets, uint32_t *skipped,
+                                       uint32_t *bytes, uint32_t *audio_packets);
+
 #ifdef __cplusplus
 }
 #endif //__cplusplus

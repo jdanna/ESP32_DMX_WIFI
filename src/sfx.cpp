@@ -14,6 +14,9 @@ constexpr uint32_t UAC_BUFFER = 19200;       // ~100 ms of 48 kHz stereo in the 
 constexpr uint32_t UAC_THRESHOLD = 4800;
 constexpr uint32_t PREFERRED_RATES[] = {48000, 44100, 32000, 24000, 22050, 16000};
 constexpr uint32_t NO_DEVICE_HINT_MS = 15000;  // nothing enumerated this long after start -> log a hint
+constexpr uint32_t REPOWER_FIRST_MS = 3000;     // no device this long after start -> re-power the root port
+constexpr uint32_t REPOWER_EVERY_MS = 5000;     // ...and keep trying this often
+constexpr uint8_t REPOWER_TRIES = 6;
 constexpr uint32_t ERROR_LOG_EVERY_MS = 5000;   // rate limit for repeating stream errors
 const char *UPLOAD_PATH = "/sfx_upload.wav";
 
@@ -50,6 +53,8 @@ QueueHandle_t usbEvents;
 TaskHandle_t mixerHandle, uacHandle;
 volatile bool usbDeviceSeen;
 volatile uint32_t xferErrors;  // isochronous transfer failures since the speaker connected
+volatile uint32_t toneFrames;  // test tone: frames left to play, bypasses the volume
+constexpr uint32_t STREAM_LOG_EVERY_MS = 10000;  // diagnostics: one stream check this long after connect
 
 String slotPath(int slot) { return String("/sfx") + (slot + 1) + ".wav"; }
 
@@ -178,16 +183,53 @@ void mixerTask(void *) {
 
     const int32_t vol = volumePct;
     const int32_t gain = vol * vol * 32768 / 10000;  // squared curve feels closer to even loudness steps
+    static uint32_t phase;                            // test tone, 440 Hz at -6 dBFS regardless of volume
+    const uint32_t phaseStep = (uint32_t)(((uint64_t)440 << 32) / outRate);
     for (uint32_t i = 0; i < frames; i++) {
-      const int32_t x = constrain(((int64_t)mix[i] * gain) >> 15, -32768, 32767);  // four loud voices overflow int32
+      int32_t x = ((int64_t)mix[i] * gain) >> 15;  // four loud voices overflow int32
+      if (toneFrames) {
+        x += (int32_t)(sinf(phase * (2 * PI / 4294967296.0f)) * 16384);
+        phase += phaseStep;
+        toneFrames = toneFrames - 1;
+      }
+      x = constrain(x, -32768, 32767);
       for (uint8_t c = 0; c < outCh; c++) out[i * outCh + c] = x;
     }
 
     esp_err_t err = ESP_FAIL;
+    static uint32_t bytesWritten, statsAt;
+    static bool statsLogged, audioLogged;
+    uint32_t packets = 0, skipped = 0, busBytes = 0, audioPackets = 0;
     xSemaphoreTake(spkLock, portMAX_DELAY);
     const bool open = spk;
-    if (spk) err = uac_host_device_write(spk, (uint8_t *)out, frames * outCh * 2, pdMS_TO_TICKS(200));
+    if (spk) {
+      err = uac_host_device_write(spk, (uint8_t *)out, frames * outCh * 2, pdMS_TO_TICKS(200));
+      uac_host_device_get_tx_stats(spk, &packets, &skipped, &busBytes, &audioPackets);
+    }
     xSemaphoreGive(spkLock);
+    if (err == ESP_OK) bytesWritten += frames * outCh * 2;
+    if (open && !audioLogged && audioPackets) {
+      audioLogged = true;
+      logInfo("sfx", "First non-silent packet on the bus (packet %lu)", (unsigned long)packets);
+    }
+    // One check per connection: the write rate should match the stream rate (e.g. 192 kB/s at
+    // 48 kHz stereo) and no packets should be skipped. Faster than real time means data isn't
+    // reaching the bus.
+    if (open && !statsLogged) {
+      if (!statsAt) statsAt = millis();
+      if (millis() - statsAt >= STREAM_LOG_EVERY_MS) {
+        const uint32_t ms = millis() - statsAt;
+        logInfo("sfx", "Speaker stream: %lu kB/s written (expect %lu), %lu packets / %lu bytes on the bus, %lu skipped, %lu with audio",
+                (unsigned long)(bytesWritten / ms), (unsigned long)(outRate * outCh * 2 / 1000),
+                (unsigned long)packets, (unsigned long)busBytes, (unsigned long)skipped, (unsigned long)audioPackets);
+        statsLogged = true;
+      }
+    }
+    if (!open) {
+      statsAt = 0;
+      bytesWritten = 0;
+      statsLogged = audioLogged = false;
+    }
     if (err != ESP_OK) {
       // A timeout means the speaker isn't consuming audio: the driver's buffer stays full.
       static uint32_t lastLog, failures;
@@ -328,6 +370,12 @@ void openSpeaker(uint8_t addr, uint8_t iface) {
     return;
   }
 
+  // Tell the endpoint its rate even when the descriptor says it has no frequency control.
+  // macOS does this unconditionally and some chips (Jieli "UACDemoV1.0") seem to expect it:
+  // the stream is otherwise accepted but never reaches the DAC.
+  err = uac_host_device_set_ep_frequency(h, rate);
+  logInfo("sfx", "Sampling frequency request %lu Hz: %s", (unsigned long)rate, err == ESP_OK ? "accepted" : esp_err_to_name(err));
+
   // Volume is applied in the mixer, so run the speaker's own control flat out.
   // If the device didn't report a usable volume range the driver can compute a
   // bogus level (silence), so check the result and put the old level back.
@@ -418,14 +466,29 @@ void uacTask(void *) {
   logInfo("sfx", "Waiting for a USB speaker");
   const uint32_t started = millis();
   bool hinted = false;
-  uint32_t errorsLogged = 0, lastErrorLog = 0;
+  uint32_t errorsLogged = 0, lastErrorLog = 0, rearmAt = 0;
+  uint8_t repowers = 0;
   UsbEvent e;
   for (;;) {
-    if (xQueueReceive(usbEvents, &e, pdMS_TO_TICKS(1000))) {
-      if (!e.device && e.event == UAC_HOST_DRIVER_EVENT_TX_CONNECTED) openSpeaker(e.addr, e.iface);
+    if (xQueueReceive(usbEvents, &e, pdMS_TO_TICKS(500))) {
+      if (!e.device && e.event == UAC_HOST_DRIVER_EVENT_TX_CONNECTED) {
+        openSpeaker(e.addr, e.iface);
+        if (usbState == USB_CONNECTED) rearmAt = millis() + 1000;
+      }
       else if (!e.device && e.event == UAC_HOST_DRIVER_EVENT_RX_CONNECTED)
         logInfo("sfx", "Ignoring a USB microphone interface (address %u)", e.addr);
       else if (e.device && e.event == UAC_HOST_DRIVER_EVENT_DISCONNECTED) closeSpeaker(e.handle);
+    }
+    // A device that was already attached at boot (e.g. after a software restart) sometimes
+    // doesn't answer the first bus reset ("Root port reset failed" from HUB) and the port then
+    // sits disabled until it's unplugged. Cycling the root port makes the stack re-detect it.
+    if (!usbDeviceSeen && repowers < REPOWER_TRIES &&
+        millis() - started > REPOWER_FIRST_MS + (uint32_t)repowers * REPOWER_EVERY_MS) {
+      repowers++;
+      if (repowers == 1) logInfo("usb", "No USB device answered yet, re-powering the port (up to %u tries)", REPOWER_TRIES);
+      usb_host_lib_set_root_port_power(false);
+      vTaskDelay(pdMS_TO_TICKS(300));
+      usb_host_lib_set_root_port_power(true);
     }
     if (!hinted && !usbDeviceSeen && millis() - started > NO_DEVICE_HINT_MS) {
       hinted = true;
@@ -433,6 +496,30 @@ void uacTask(void *) {
       // attach either, since hubs only connect upstream when they see 5 V from the host.
       logWarn("usb", "No USB device detected on the USB-C port. This board doesn't put 5 V on the port, so the "
                      "speaker needs 5 V injected on VBUS (a powered OTG adapter); a powered hub isn't enough.");
+    }
+    // Some speaker chips (reports mention Jieli "UACDemoV1.0") seem to want a mute/volume
+    // command after audio data is already flowing, so send them again once the mixer is streaming.
+    if (rearmAt && (int32_t)(millis() - rearmAt) >= 0) {
+      rearmAt = 0;
+      xSemaphoreTake(spkLock, portMAX_DELAY);
+      if (spk) {
+        // Last Mac-mimic for stubborn chips: the Mac idles the stream at alt 0 and opens alt 1 when
+        // it starts playing, after mute/volume are already set. Cycle the interface the same way.
+        const esp_err_t s0 = uac_host_device_suspend(spk);
+        const esp_err_t s1 = uac_host_device_resume(spk);
+        const esp_err_t f = uac_host_device_set_ep_frequency(spk, outRate);
+        logInfo("sfx", "Cycled the stream interface: alt 0 %s, alt 1 %s, frequency %s", esp_err_to_name(s0),
+                esp_err_to_name(s1), esp_err_to_name(f));
+        const esp_err_t m = uac_host_device_set_mute(spk, false);
+        const esp_err_t v = uac_host_device_set_volume(spk, 100);
+        bool muted = false;
+        int16_t db = 0;
+        const esp_err_t gm = uac_host_device_get_mute(spk, &muted), gv = uac_host_device_get_volume_db(spk, &db);
+        logInfo("sfx", "Re-sent unmute (%s) and volume (%s) while streaming; speaker reports mute=%s, %.1f dB",
+                esp_err_to_name(m), esp_err_to_name(v), gm == ESP_OK ? (muted ? "on" : "off") : esp_err_to_name(gm),
+                gv == ESP_OK ? db / 256.0f : 0.0f);
+      }
+      xSemaphoreGive(spkLock);
     }
     const uint32_t errors = xferErrors;
     if (errors != errorsLogged && millis() - lastErrorLog >= ERROR_LOG_EVERY_MS) {
@@ -462,7 +549,9 @@ void sfxBegin(bool usbAudio) {
     return;
   }
   usbEvents = xQueueCreate(10, sizeof(UsbEvent));
-  xTaskCreatePinnedToCore(uacTask, "uac_events", 4096, nullptr, 2, &uacHandle, 0);
+  // Above the mixer: the mixer holds spkLock for nearly the whole time it streams, and a
+  // lower-priority task waiting on that mutex would never get it (FreeRTOS gives no fairness).
+  xTaskCreatePinnedToCore(uacTask, "uac_events", 4096, nullptr, 7, &uacHandle, 0);
   xTaskCreatePinnedToCore(usbHostTask, "usb_host", 4096, nullptr, 5, nullptr, 0);
 }
 
@@ -480,6 +569,12 @@ void sfxPlay(int slot) {
   xSemaphoreTake(lock, portMAX_DELAY);
   if (sounds[slot].pcm && usbState == USB_CONNECTED) voices[slot] = {true, 0};  // restarts if already playing
   xSemaphoreGive(lock);
+}
+
+void sfxTone() {
+  if (usbState != USB_CONNECTED) return;
+  toneFrames = outRate * 3;  // three seconds
+  logInfo("sfx", "Test tone");
 }
 
 void sfxStop(int slot) {

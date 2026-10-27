@@ -184,6 +184,10 @@ typedef struct uac_interface {
     int16_t vol_max_db;                        /*!< volume max with 1/256 db step */
     int16_t vol_res_db;                        /*!< volume resolution with 1/256 db step */
     uac_iface_alt_t *iface_alt;                /*!< audio stream alternate setting */
+    uint32_t tx_packets;                       /*!< isochronous OUT packets completed (diagnostics) */
+    uint32_t tx_skipped;                       /*!< of those, packets the host reported as not sent (diagnostics) */
+    uint32_t tx_bytes;                         /*!< bytes the host reports as actually sent (diagnostics) */
+    uint32_t tx_audio_packets;                 /*!< packets whose payload wasn't all zero (diagnostics) */
 } uac_iface_t;
 
 /**
@@ -1341,6 +1345,25 @@ static void stream_tx_xfer_done(usb_transfer_t *out_xfer)
 
     switch (out_xfer->status) {
     case USB_TRANSFER_STATUS_COMPLETED: {
+        // Per-packet status: a packet can be SKIPPED (scheduled in a frame that
+        // had already passed) while the transfer as a whole still completes.
+        size_t off = 0;
+        for (int j = 0; j < iface->packet_num; j++) {
+            iface->tx_packets++;
+            if (out_xfer->isoc_packet_desc[j].status != USB_TRANSFER_STATUS_COMPLETED) {
+                iface->tx_skipped++;
+            } else {
+                iface->tx_bytes += out_xfer->isoc_packet_desc[j].actual_num_bytes;
+                const uint32_t *w = (const uint32_t *)(out_xfer->data_buffer + off);
+                for (size_t k = 0; k < out_xfer->isoc_packet_desc[j].num_bytes / 4; k++) {
+                    if (w[k]) {
+                        iface->tx_audio_packets++;
+                        break;
+                    }
+                }
+            }
+            off += out_xfer->isoc_packet_desc[j].num_bytes;
+        }
         // Submit the next transfer
         stream_tx_xfer_submit(out_xfer);
         return;
@@ -2579,6 +2602,42 @@ exit_critical:
         UAC_EXIT_CRITICAL();
     }
 
+    return ret;
+}
+
+esp_err_t uac_host_device_get_tx_stats(uac_host_device_handle_t uac_dev_handle, uint32_t *packets, uint32_t *skipped,
+                                       uint32_t *bytes, uint32_t *audio_packets)
+{
+    uac_iface_t *iface = get_iface_by_handle(uac_dev_handle);
+    UAC_RETURN_ON_INVALID_ARG(iface);
+    if (packets) {
+        *packets = iface->tx_packets;
+    }
+    if (skipped) {
+        *skipped = iface->tx_skipped;
+    }
+    if (bytes) {
+        *bytes = iface->tx_bytes;
+    }
+    if (audio_packets) {
+        *audio_packets = iface->tx_audio_packets;
+    }
+    return ESP_OK;
+}
+
+esp_err_t uac_host_device_set_ep_frequency(uac_host_device_handle_t uac_dev_handle, uint32_t freq)
+{
+    uac_iface_t *iface = get_iface_by_handle(uac_dev_handle);
+    UAC_RETURN_ON_INVALID_ARG(iface);
+    UAC_RETURN_ON_ERROR(uac_host_interface_try_lock(iface, DEFAULT_CTRL_XFER_TIMEOUT_MS), "Unable to lock UAC Interface");
+    esp_err_t ret = ESP_OK;
+    UAC_GOTO_ON_FALSE((UAC_INTERFACE_STATE_ACTIVE == iface->state || UAC_INTERFACE_STATE_READY == iface->state),
+                      ESP_ERR_INVALID_STATE, "device not ready or active");
+    ret = uac_cs_request_set_ep_frequency(iface, iface->iface_alt[iface->cur_alt].ep_addr, freq);
+    uac_host_interface_unlock(iface);
+    return ret;
+fail:
+    uac_host_interface_unlock(iface);
     return ret;
 }
 

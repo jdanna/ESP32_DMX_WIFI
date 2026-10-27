@@ -466,6 +466,7 @@ void handleSfx() {
   if (!readBody(in)) return;
   if (in["play"].is<int>()) sfxPlay(in["play"].as<int>());
   if (in["stop"].is<int>()) sfxStop(in["stop"].as<int>());
+  if (in["tone"].is<int>()) sfxTone();
   if (in["delete"].is<int>()) {
     const int slot = in["delete"];
     if (slot < 0 || slot >= SFX_COUNT) {
