@@ -594,13 +594,13 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
         <label class="switch warn-switch" title="Let moves run past the max swing either side of center"><input type="checkbox" id="overrideToggle"><span class="track"></span>Ignore travel limit</label>
       </div>
       <div class="anim-random">
-        <label class="switch" title="Turn the head at random. Stop turns it off"><input type="checkbox" id="randomToggle"><span class="track"></span>Random <span class="kbd">R</span></label>
-        <input id="randomInterval" type="range" min="1" max="30" step="0.5" aria-label="Random interval" title="Typical time between changes; each one comes at a random time from half to one and a half times this">
+        <label class="switch" title="Every so often, turn the head to 1–3 random points back to back, then return to center. Stop turns it off"><input type="checkbox" id="randomToggle"><span class="track"></span>Random <span class="kbd">R</span></label>
+        <input id="randomInterval" type="range" min="1" max="20" step="0.5" aria-label="Random interval" title="Typical pause between behaviours; each one comes at a random time from half to one and a half times this">
         <span class="mono" id="randomVal"></span>
       </div>
       <div class="anim-move">
-        <label class="switch" title="Light the eyes whenever the head moves, and for 5 s after it stops"><input type="checkbox" id="eyesMoveToggle"><span class="track"></span>Eyes on move</label>
-        <label class="switch" title="Play a random sound when the head starts moving. After a sound, the next waits until 5 s after it ends"><input type="checkbox" id="soundMoveToggle"><span class="track"></span>Sound on move</label>
+        <label class="switch" title="Light the eyes whenever the head moves, and for 2 s after it stops"><input type="checkbox" id="eyesMoveToggle"><span class="track"></span>Eyes on move</label>
+        <label class="switch" title="Play a random sound when the head starts moving. After a sound, the next waits until 1 s after it ends"><input type="checkbox" id="soundMoveToggle"><span class="track"></span>Sound on move</label>
       </div>
     </div>
 
@@ -1191,7 +1191,7 @@ function renderLiveChans() {
         state = v < c - z ? 'left' : v > c + z ? 'right' : 'stop';
         on = state !== 'stop';
       } else if (key === 'vol') state = Math.round(v * 100 / 255) + '%';
-      else if (key === 'rtime') state = (v * 10 / 255).toFixed(1) + ' s';
+      else if (key === 'rtime') state = (v * 20 / 255).toFixed(1) + ' s';
       else {
         on = v >= thr;
         state = on ? 'on' : 'off';
@@ -1700,7 +1700,7 @@ function outputGroups() {
     : [['left', 'Motor left'], ['right', 'Motor right']];
   return [
     ['Animatronic', [...motor, ['center', 'Center head'], ['eyes', 'Eyes / lights'], ['eyesmove', 'Eyes on move on/off'],
-      ['soundmove', 'Sound on move on/off'], ['random', 'Random mode on/off'], ['rtime', 'Random interval 0–10 s']]],
+      ['soundmove', 'Sound on move on/off'], ['random', 'Random mode on/off'], ['rtime', 'Random interval 0–20 s']]],
     ['Sound', [...[0, 1, 2, 3].map(i => ['sfx' + i, '♪ ' + sfxName(i)]), ['vol', 'Volume']]],
     ['Relays', [3, 4, 5, 6, 7].map(i => {
       const name = relayName(i), plain = `Relay ${i + 1}`;

@@ -2,6 +2,7 @@
 <Fixture Name="Animatronic" ShortName="Animatron" Company="ESP32 DMX Relay">
   <Copyright Notice="© Joey D'Anna 2026" />
   <History Date="27-10-26" Author="Joey D'Anna" Comment="Created for firmware 1.1.0, default 16-channel mapping" />
+  <History Date="28-10-26" Author="Joey D'Anna" Comment="Channel 2 is Center Head; eyes-on-move hold 2 s, sound-on-move gap 1 s; random interval 0-20 s, 1-3 turns then center" />
   <Manual Filename="" Summary="Animatronic firmware on the Waveshare ESP32-S3-POE-ETH-8DI-8RO. Matches the default mapping (Mapping page, Restore defaults). Switch channels act at the device threshold (default 128). Sounds and Center act when the channel rises, so return to Ready / Idle before triggering again." />
   <Control>
     <Attribute ID="HeadDir" Name="Head Direction" Description="Below 108 turns left, 108-148 stops, above 148 turns right (center 128, dead zone 20)" Group="P">
@@ -10,33 +11,34 @@
       <Function ID="2" Name="Stop" Display="'Stop'" Dmx="108~148" />
       <Function ID="3" Name="Right" Display="'Right'" Dmx="149~255" />
     </Attribute>
-    <Attribute ID="Spare2" Name="Channel 2" Description="Unassigned in the default mapping" Group="S">
-      <Locate Locate="1:0" PowerOn="1:0" />
-      <Function ID="1" Name="Raw DMX" Display="'Raw DMX %.f',0~255" Dmx="0~255" />
+    <Attribute ID="CenterHead" Name="Center Head" Description="Drives the head back to center when the channel rises past the threshold, like the Center button" Group="P">
+      <Locate Locate="1" PowerOn="1" />
+      <Function ID="1" Name="Idle" Display="'Idle'" Dmx="0~0" />
+      <Function ID="2" Name="Center" Display="'Center'" Dmx="255~255" />
     </Attribute>
     <Attribute ID="Eyes" Name="Eyes" Description="Eyes / lights relay" Group="I">
       <Locate Locate="2" PowerOn="1" />
       <Function ID="1" Name="Off" Display="'Off'" Dmx="0~0" />
       <Function ID="2" Name="On" Display="'On'" Dmx="255~255" />
     </Attribute>
-    <Attribute ID="EyesOnMove" Name="Eyes On Move" Description="Eyes light while the head moves and for 5 s after it stops" Group="E">
+    <Attribute ID="EyesOnMove" Name="Eyes On Move" Description="Eyes light while the head moves and for 2 s after it stops" Group="E">
       <Locate Locate="1" PowerOn="1" />
       <Function ID="1" Name="Off" Display="'Off'" Dmx="0~0" />
       <Function ID="2" Name="On" Display="'On'" Dmx="255~255" />
     </Attribute>
-    <Attribute ID="SoundOnMove" Name="Sound On Move" Description="A random sound when the head starts moving, at most one per sound plus 5 s" Group="E">
+    <Attribute ID="SoundOnMove" Name="Sound On Move" Description="A random sound when the head starts moving, the next waits until 1 s after it ends" Group="E">
       <Locate Locate="1" PowerOn="1" />
       <Function ID="1" Name="Off" Display="'Off'" Dmx="0~0" />
       <Function ID="2" Name="On" Display="'On'" Dmx="255~255" />
     </Attribute>
-    <Attribute ID="RandomMode" Name="Random Mode" Description="Head turns to random points on its own" Group="E">
+    <Attribute ID="RandomMode" Name="Random Mode" Description="Every so often the head turns to 1-3 random points back to back, then returns to center" Group="E">
       <Locate Locate="1" PowerOn="1" />
       <Function ID="1" Name="Off" Display="'Off'" Dmx="0~0" />
       <Function ID="2" Name="On" Display="'On'" Dmx="255~255" />
     </Attribute>
-    <Attribute ID="RandomTime" Name="Random Interval" Description="Typical time between random turns, 0-10 s; each is 0.5-1.5x this" Group="E">
+    <Attribute ID="RandomTime" Name="Random Interval" Description="Typical pause between random behaviours, 0-20 s; each is 0.5-1.5x this" Group="E">
       <Locate Locate="1:50" PowerOn="1:50" />
-      <Function ID="1" Name="Interval" Display="'%.1f s',0.0~10.0" Dmx="0~255" />
+      <Function ID="1" Name="Interval" Display="'%.1f s',0.0~20.0" Dmx="0~255" />
     </Attribute>
     <Attribute ID="Volume" Name="Volume" Description="Sound effects volume" Group="S">
       <Locate Locate="1:80" PowerOn="1:80" />
@@ -90,7 +92,7 @@
     </Physical>
     <Include>
       <Attribute ID="HeadDir" ChannelOffset="1" Wheel="2" />
-      <Attribute ID="Spare2" ChannelOffset="2" Wheel="13" />
+      <Attribute ID="CenterHead" ChannelOffset="2" Wheel="3" />
       <Attribute ID="Eyes" ChannelOffset="3" Wheel="1" />
       <Attribute ID="EyesOnMove" ChannelOffset="4" Wheel="4" />
       <Attribute ID="SoundOnMove" ChannelOffset="5" Wheel="5" />
@@ -101,15 +103,15 @@
       <Attribute ID="Sound2" ChannelOffset="10" Wheel="10" />
       <Attribute ID="Sound3" ChannelOffset="11" Wheel="11" />
       <Attribute ID="Sound4" ChannelOffset="12" Wheel="12" />
-      <Attribute ID="Spare13" ChannelOffset="13" Wheel="14" />
-      <Attribute ID="Spare14" ChannelOffset="14" Wheel="15" />
-      <Attribute ID="Spare15" ChannelOffset="15" Wheel="16" />
-      <Attribute ID="Spare16" ChannelOffset="16" Wheel="17" />
+      <Attribute ID="Spare13" ChannelOffset="13" Wheel="13" />
+      <Attribute ID="Spare14" ChannelOffset="14" Wheel="14" />
+      <Attribute ID="Spare15" ChannelOffset="15" Wheel="15" />
+      <Attribute ID="Spare16" ChannelOffset="16" Wheel="16" />
     </Include>
   </Mode>
   <Macro>
     <Macro Name="Head Stop">
-      <Set Channel="HeadDir:2" Delay="0" />
+      <Set Channel="HeadDir:2,CenterHead:1" Delay="0" />
     </Macro>
     <Macro Name="Random On">
       <Set Channel="RandomMode:2" Delay="0" />

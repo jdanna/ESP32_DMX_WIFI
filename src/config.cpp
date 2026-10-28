@@ -296,7 +296,7 @@ bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkC
     if (err.length()) return false;
     if (an["homeOnBoot"].is<bool>()) c.io.anim.homeOnBoot = an["homeOnBoot"];
     if (an["random"].is<bool>()) c.io.anim.random = an["random"];
-    if (readRanged(an["randomInterval"], 1000, 30000, n, "Random interval", err)) c.io.anim.randomIntervalMs = n;
+    if (readRanged(an["randomInterval"], 1000, RANDOM_INTERVAL_MAX_MS, n, "Random interval", err)) c.io.anim.randomIntervalMs = n;
     if (err.length()) return false;
     if (readRanged(an["randomChannel"], 0, INPUT_COUNT, n, "Random mode channel", err)) c.io.anim.randomSlot = n;
     if (err.length()) return false;
@@ -443,6 +443,9 @@ void configLoad(Config &cfg) {
   // The channel range grew from 8 to 16, so a start address near the top no longer fits.
   for (const char *k : {"dmx", "artnet"})
     if (doc[k]["start"].is<int>() && doc[k]["start"].as<int>() > RANGE_MAX_START) doc[k]["start"] = RANGE_MAX_START;
+  // The random interval's maximum dropped from 30 s to 20 s.
+  if (doc["anim"]["randomInterval"].is<int>() && doc["anim"]["randomInterval"].as<int>() > RANDOM_INTERVAL_MAX_MS)
+    doc["anim"]["randomInterval"] = RANDOM_INTERVAL_MAX_MS;
   String err;
   bool changed;
   if (!configFromJson(cfg, doc.as<JsonObjectConst>(), err, changed)) {

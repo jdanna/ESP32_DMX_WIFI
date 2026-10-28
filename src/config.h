@@ -36,6 +36,8 @@ struct SfxSettings {
   uint8_t volume = 80;                    // percent, used while no volume channel is live
 };
 
+#define RANDOM_INTERVAL_MAX_MS 20000  // random interval slider and channel at full
+
 // Animatronic motor / center-switch behaviour. Stored in every build so switching
 // firmware variants keeps it; only ANIMATRONIC builds act on it.
 struct AnimSettings {
@@ -43,19 +45,19 @@ struct AnimSettings {
   uint16_t maxSwingMs = 2000;     // furthest the head runs either side of center, also the homing search limit
   bool homeOnBoot = false;        // find center by itself after power-up
   bool random = false;            // random head moves and eye changes
-  uint16_t randomIntervalMs = 6000;  // typical time between random changes; each one is 0.5-1.5x this
+  uint16_t randomIntervalMs = 6000;  // typical pause between random behaviours; each one is 0.5-1.5x this
   // Channels that override the two random settings while an input is live, 0 = unassigned:
-  // on/off switches at the threshold, the interval channel's 0-255 maps to 0-10 s.
+  // on/off switches at the threshold, the interval channel's 0-255 maps to 0-20 s.
   uint8_t randomSlot = 6;
   uint8_t randomTimeSlot = 7;
-  // Eyes on move: eyes on while the head moves and for 5 s after. Sound on move: a random sound
-  // when a move starts, then quiet until 5 s after it ends. Each has a channel that switches it
+  // Eyes on move: eyes on while the head moves and for 2 s after. Sound on move: a random sound
+  // when a move starts, then quiet until 1 s after it ends. Each has a channel that switches it
   // at the threshold, overriding the setting while an input is live.
   bool eyesOnMove = false;
   bool soundOnMove = false;
   uint8_t eyesMoveSlot = 4;
   uint8_t soundMoveSlot = 5;
-  uint8_t centerSlot = 0;         // rising past the threshold drives the head back to center
+  uint8_t centerSlot = 2;         // rising past the threshold drives the head back to center
   bool limitNc = false;           // center switch is normally closed (opens at center)
   bool swap = false;              // swap which relay drives left and right
   uint8_t map[ANIM_FN_COUNT] = {0, 0, 3};  // function -> slot in range (1-16), 0 = unassigned

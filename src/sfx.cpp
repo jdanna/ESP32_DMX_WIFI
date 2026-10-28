@@ -573,7 +573,7 @@ void sfxPlay(int slot) {
 }
 
 void sfxMoveSound() {
-  constexpr uint32_t QUIET_MS = 5000;  // after a sound on move ends, this long before the next
+  constexpr uint32_t QUIET_MS = 1000;  // after a sound on move ends, this long before the next
   static uint32_t quietUntil;
   static bool played;
   const uint32_t now = millis();

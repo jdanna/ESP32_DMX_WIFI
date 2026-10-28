@@ -75,17 +75,17 @@ shares the settings storage, so switching builds keeps the network and DMX setup
   Find center (**H**) re-homes, Random (**R**) with its interval slider, ignore travel limit, 4 sound slots with
   upload, volume, **Eyes on move** and **Sound on move**. A **Channels** card shows what each of the 16 channels
   drives, with its live level and state. It follows mapping changes saved from any browser.
-- **Eyes on move:** the eyes light whenever the head moves and stay on 5 s after it stops, on top of the Eyes
-  control. **Sound on move:** a move starting plays a random loaded sound; the next can't play until 5 s after that
+- **Eyes on move:** the eyes light whenever the head moves and stay on 2 s after it stops, on top of the Eyes
+  control. **Sound on move:** a move starting plays a random loaded sound; the next can't play until 1 s after that
   one ends. Both are saved with the settings and can be switched by their channels (on at the threshold), which
   override the checkboxes while DMX or Art-Net is live, like the random channels.
 - **Center head** channel: rising above the threshold drives the head back to center, like the Center button.
   Ignored in manual override.
-- **Random:** turns the head to random points within 80% of the max swing (now and then straight ahead), each
-  turn 0.5–1.5× the interval after the last one finishes (slider 1–30 s, default 6 s). The eyes stay manual. It homes first
+- **Random:** each behaviour turns the head to 1–3 random points within 80% of the max swing, back to back, then
+  returns to center. The next behaviour starts 0.5–1.5× the interval after that (slider 1–20 s, default 6 s). The eyes stay manual. It homes first
   if needed, waits for a move to finish, pauses in manual override, and Stop turns it off. Saved with the settings.
   Both can also be mapped to channels: **Random mode on/off** (on at the threshold) and **Random interval** (0–255 =
-  0–10 s). While DMX or Art-Net is live they override the toggle and slider, which then show the channel's value.
+  0–20 s). While DMX or Art-Net is live they override the toggle and slider, which then show the channel's value.
   On signal loss they hold, or with **all off** hand control back to the page.
 - **Homing:** at power-up (2 s in, off by default) or on **Find center**, the head swings left, then right, each
   swing 250 ms further from where it started, up to the **max swing** (default 2 s), until the center switch
@@ -103,7 +103,7 @@ shares the settings storage, so switching builds keeps the network and DMX setup
   | Ch | Default | Ch | Default |
   |---|---|---|---|
   | 1 | Motor direction (center 128, dead zone 20) | 7 | Random interval |
-  | 2 | — | 8 | Volume |
+  | 2 | Center head | 8 | Volume |
   | 3 | Eyes / lights | 9–12 | Sound 1–4 |
   | 4 | Eyes on move | 13–16 | — |
   | 5 | Sound on move | | |

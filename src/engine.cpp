@@ -14,7 +14,7 @@ constexpr uint16_t OP_POLL_REPLY = 0x2100;
 constexpr uint16_t OP_DMX = 0x5000;
 constexpr uint32_t REFRESH_MS = 1000;  // rewrite the expander periodically even without changes
 constexpr uint32_t KEY_HOLD_MS = 1500;  // held keys lapse if the page stops repeating them (tab closed, network gone)
-constexpr uint32_t RANDOM_CHANNEL_MAX_MS = 10000;  // random interval channel at full
+constexpr uint32_t RANDOM_CHANNEL_MAX_MS = 20000;  // random interval channel at full
 #ifdef ANIMATRONIC
 constexpr uint8_t ANIM_MASK = ANIM_RELAY_MASK;  // relays driven by the animatronic controller
 #else

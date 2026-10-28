@@ -15,7 +15,8 @@ constexpr int32_t SAVE_MIN_CHANGE_MS = 20;   // ...and it moved at least this mu
 const char *NVS_NS = "anim", *NVS_POS = "pos";
 constexpr int32_t RANDOM_REACH_PCT = 80;     // random targets stay within this much of the max swing
 constexpr uint32_t RANDOM_START_MS = 500;    // first random change this soon after turning it on
-constexpr uint32_t EYES_HOLD_MS = 5000;      // eyes on move: stay lit this long after the head stops
+constexpr uint32_t RANDOM_MAX_TURNS = 3;     // each random behaviour: 1 to this many turns, then back to center
+constexpr uint32_t EYES_HOLD_MS = 2000;      // eyes on move: stay lit this long after the head stops
 
 const char *DIR_NAMES[] = {"stop", "left", "right"};
 const char *REASON_NAMES[] = {nullptr, "user", "travel", "timeout", "input", "homed", "homeFailed"};
@@ -43,11 +44,15 @@ uint8_t inputPrev;
 // Driving back to center once homed; stops at the switch, or gives up this far past it.
 bool centering;
 int32_t centerOverrunMs;
-// Random mode: the next change is due at randomDueMs; gotoActive while the head
+// Random mode: the next step is due at randomDueMs; gotoActive while the head
 // runs to gotoMs. Engine task only, except gotoActive which request() clears.
+// A behaviour is a few turns then a return to center, run back to back; the
+// random pause comes only between behaviours.
 bool randomPrev, randomArm, gotoActive;
 uint32_t randomDueMs;
 int32_t gotoMs;
+bool randomBusy;      // a behaviour is in progress
+uint8_t randomTurns;  // turns left in it before the return to center
 // Homing search, relative to where it started. directMs > 0 while making the first,
 // straight run toward where the saved position says center is.
 int32_t relMs, ampMs, directMs;
@@ -125,14 +130,21 @@ void startCentering(bool center) {
   target = posMs < 0 ? MOTOR_RIGHT : MOTOR_LEFT;
 }
 
-// Caller holds mux. One random turn of the head; every few turns, look straight ahead.
+// Caller holds mux. The next step of a random behaviour: a turn of the head, or
+// once the turns are used up, back to center (which ends the behaviour).
 void randomStep(bool center) {
   if (!posKnown) return;
-  const int32_t reach = limitMs * RANDOM_REACH_PCT / 100;
-  if (rnd(5) == 0 && abs(posMs) > HOME_STEP_MS) {
+  if (!randomBusy) {
+    randomBusy = true;
+    randomTurns = 1 + rnd(RANDOM_MAX_TURNS);
+  }
+  if (randomTurns == 0) {
+    randomBusy = false;
     startCentering(center);
     return;
   }
+  randomTurns--;  // counted even if no turn is found below, so the behaviour always ends
+  const int32_t reach = limitMs * RANDOM_REACH_PCT / 100;
   // Somewhere else in the range, far enough from here that it's a real turn.
   int32_t to = posMs;
   for (int i = 0; i < 8 && abs(to - posMs) < limitMs / 4; i++) to = (int32_t)rnd(2 * reach + 1) - reach;
@@ -234,6 +246,7 @@ uint8_t animUpdate(uint32_t now, const AnimSettings &s, uint8_t inputMask, bool 
   if (randomOn != randomPrev) {
     randomPrev = randomOn;
     randomDueMs = now + RANDOM_START_MS;
+    randomBusy = false;
     if (!randomOn && gotoActive) {
       gotoActive = false;
       target = MOTOR_STOP;
@@ -243,8 +256,8 @@ uint8_t animUpdate(uint32_t now, const AnimSettings &s, uint8_t inputMask, bool 
   }
   const bool still = dir == MOTOR_STOP && target == MOTOR_STOP && home != HOME_SEARCHING && !centering;
   if (randomOn && still && randomArm) {
-    randomArm = false;  // the last change has finished: the pause starts now
-    randomDueMs = now + randomDelay(s);
+    randomArm = false;  // the last step has finished: next step now, or the pause once the behaviour is done
+    randomDueMs = randomBusy ? now : now + randomDelay(s);
   } else if (randomOn && still && now >= BOOT_HOME_DELAY_MS && (int32_t)(now - randomDueMs) >= 0) {
     if (!posKnown && home == HOME_NONE) startHoming(center);
     else randomStep(center);
@@ -359,7 +372,7 @@ uint8_t animUpdate(uint32_t now, const AnimSettings &s, uint8_t inputMask, bool 
             saved < 0 ? "left" : "right", saved < 0 ? "right" : "left");
   if (ev & EV_SAVED_MISSED)
     logWarn("anim", "Center wasn't where the saved position said; searching the other side");
-  if (ev & EV_RANDOM_ON) logInfo("anim", "Random mode on, about every %.1f s", s.randomIntervalMs / 1000.0f);
+  if (ev & EV_RANDOM_ON) logInfo("anim", "Random mode on, about every %.1f s between behaviours", s.randomIntervalMs / 1000.0f);
   if (ev & EV_RANDOM_OFF) logInfo("anim", "Random mode off");
   if (ev & EV_CENTER_MISSED)
     logWarn("anim", "Went past center without the switch closing; position may be off, use Find center");
