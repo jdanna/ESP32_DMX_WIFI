@@ -78,6 +78,7 @@ void handleIndex() {
 
 void buildStatus(JsonObject root) {
   root["fw"] = FW_VERSION;
+  root["cfgRev"] = g_cfgRev;  // changes whenever settings are saved, from any page
   root["variant"] = FW_VARIANT;
   root["hostname"] = g_cfg.hostname;
   root["uptime"] = millis() / 1000;
@@ -112,7 +113,7 @@ void buildStatus(JsonObject root) {
   }
   JsonObject inputs = root["inputs"].to<JsonObject>();
   JsonArray inDmx = inputs["dmx"].to<JsonArray>(), inArt = inputs["art"].to<JsonArray>();
-  for (int i = 0; i < RELAY_COUNT; i++) {
+  for (int i = 0; i < INPUT_COUNT; i++) {
     inDmx.add(st.inDmx[i]);
     inArt.add(st.inArt[i]);
   }
@@ -131,6 +132,14 @@ void buildStatus(JsonObject root) {
   an["pos"] = st.anim.posMs;
   an["centering"] = st.anim.centering;
   an["random"] = st.anim.random;
+  an["randomOn"] = st.anim.randomOn;
+  an["randomFromInput"] = st.anim.randomFromInput;
+  an["randomInterval"] = st.anim.randomMs;
+  an["randomIntervalFromInput"] = st.anim.randomMsFromInput;
+  an["eyesOnMove"] = st.anim.eyesOnMove;
+  an["eyesOnMoveFromInput"] = st.anim.eyesOnMoveFromInput;
+  an["soundOnMove"] = st.anim.soundOnMove;
+  an["soundOnMoveFromInput"] = st.anim.soundOnMoveFromInput;
 
   JsonObject sx = root["sfx"].to<JsonObject>();
   sfxStatusJson(sx);
@@ -161,11 +170,15 @@ String liveJson(const EngineStatus &st) {
     d.add(st.dmxValue[i]);
     a.add(st.artValue[i]);
     src.add((int)st.source[i]);
+  }
+  for (int i = 0; i < INPUT_COUNT; i++) {
     id.add(st.inDmx[i]);
     ia.add(st.inArt[i]);
   }
 #ifdef ANIMATRONIC
-  // [dir, target, atLimit, reason, center, closed, override, eyes, home, position ms, centering, random]
+  // [dir, target, atLimit, reason, center, closed, override, eyes, home, position ms, centering, random running,
+  //  random on, random on/off from its channel, random interval ms, interval from its channel,
+  //  eyes on move, from its channel, sound on move, from its channel]
   JsonArray an = doc["an"].to<JsonArray>();
   an.add((int)st.anim.dir);
   an.add((int)st.anim.target);
@@ -179,6 +192,14 @@ String liveJson(const EngineStatus &st) {
   an.add(st.anim.posMs);
   an.add(st.anim.centering);
   an.add(st.anim.random);
+  an.add(st.anim.randomOn);
+  an.add(st.anim.randomFromInput);
+  an.add(st.anim.randomMs);
+  an.add(st.anim.randomMsFromInput);
+  an.add(st.anim.eyesOnMove);
+  an.add(st.anim.eyesOnMoveFromInput);
+  an.add(st.anim.soundOnMove);
+  an.add(st.anim.soundOnMoveFromInput);
   // [playing mask, volume %, volume set by an input]
   JsonArray sx = doc["sx"].to<JsonArray>();
   sx.add(sfxPlayingMask());
@@ -307,7 +328,13 @@ void handlePostLog() {
 
 void handleGetConfig() {
   JsonDocument doc;
-  configToJson(g_cfg, doc.to<JsonObject>(), false);
+  if (server.hasArg("defaults")) {  // factory settings, for the Mapping page's Restore defaults
+    static Config d;  // too big to want on the stack
+    configDefaults(d);
+    configToJson(d, doc.to<JsonObject>(), false);
+  } else {
+    configToJson(g_cfg, doc.to<JsonObject>(), false);
+  }
   sendJson(200, doc);
 }
 
@@ -326,6 +353,9 @@ void handlePostConfig() {
   // saves on a device whose older settings share channels.
   const bool mapping = !in["relays"]["map"].isNull() || !in["anim"]["map"].isNull() ||
                        !in["anim"]["dirChannel"].isNull() || !in["anim"]["motorMode"].isNull() ||
+                       !in["anim"]["randomChannel"].isNull() || !in["anim"]["randomTimeChannel"].isNull() ||
+                       !in["anim"]["centerChannel"].isNull() || !in["anim"]["eyesMoveChannel"].isNull() ||
+                       !in["anim"]["soundMoveChannel"].isNull() ||
                        !in["sfx"]["map"].isNull() || !in["sfx"]["volChannel"].isNull();
   if (mapping && !configMappingExclusive(c, err)) {
     sendError(400, err);

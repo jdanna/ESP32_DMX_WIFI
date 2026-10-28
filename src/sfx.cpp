@@ -2,6 +2,7 @@
 #include "sfx.h"
 
 #include <LittleFS.h>
+#include <esp_random.h>
 #include "usb/uac_host.h"
 #include "usb/usb_host.h"
 #include "log.h"
@@ -568,6 +569,25 @@ void sfxPlay(int slot) {
   if (slot < 0 || slot >= SFX_COUNT) return;
   xSemaphoreTake(lock, portMAX_DELAY);
   if (sounds[slot].pcm && usbState == USB_CONNECTED) voices[slot] = {true, 0};  // restarts if already playing
+  xSemaphoreGive(lock);
+}
+
+void sfxMoveSound() {
+  constexpr uint32_t QUIET_MS = 5000;  // after a sound on move ends, this long before the next
+  static uint32_t quietUntil;
+  static bool played;
+  const uint32_t now = millis();
+  if (usbState != USB_CONNECTED || (played && (int32_t)(now - quietUntil) < 0)) return;
+  xSemaphoreTake(lock, portMAX_DELAY);
+  int loaded[SFX_COUNT], n = 0;
+  for (int i = 0; i < SFX_COUNT; i++)
+    if (sounds[i].pcm) loaded[n++] = i;
+  if (n) {
+    const int k = loaded[esp_random() % n];
+    voices[k] = {true, 0};
+    quietUntil = now + (uint32_t)((uint64_t)sounds[k].frames * 1000 / sounds[k].rate) + QUIET_MS;
+    played = true;
+  }
   xSemaphoreGive(lock);
 }
 

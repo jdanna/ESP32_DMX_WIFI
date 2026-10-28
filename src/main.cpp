@@ -1,7 +1,7 @@
 // DMX / Art-Net relay node for the Waveshare ESP32-S3-POE-ETH-8DI-8RO.
 //
 // DMX on the RS485 port and Art-Net on Ethernet or Wi-Fi each listen to an
-// 8-channel range; those channels switch the eight relays. Everything is
+// 16-channel range; those channels switch the eight relays. Everything is
 // configured from the built-in web page.
 
 #include <Arduino.h>

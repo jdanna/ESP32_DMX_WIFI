@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Fixture Name="Animatronic" ShortName="Animatron" Company="ESP32 DMX Relay">
+  <Copyright Notice="© Joey D'Anna 2026" />
+  <History Date="27-10-26" Author="Joey D'Anna" Comment="Created for firmware 1.1.0, default 16-channel mapping" />
+  <Manual Filename="" Summary="Animatronic firmware on the Waveshare ESP32-S3-POE-ETH-8DI-8RO. Matches the default mapping (Mapping page, Restore defaults). Switch channels act at the device threshold (default 128). Sounds and Center act when the channel rises, so return to Ready / Idle before triggering again." />
+  <Control>
+    <Attribute ID="HeadDir" Name="Head Direction" Description="Below 108 turns left, 108-148 stops, above 148 turns right (center 128, dead zone 20)" Group="P">
+      <Locate Locate="2" PowerOn="2" />
+      <Function ID="1" Name="Left" Display="'Left'" Dmx="0~107" />
+      <Function ID="2" Name="Stop" Display="'Stop'" Dmx="108~148" />
+      <Function ID="3" Name="Right" Display="'Right'" Dmx="149~255" />
+    </Attribute>
+    <Attribute ID="Spare2" Name="Channel 2" Description="Unassigned in the default mapping" Group="S">
+      <Locate Locate="1:0" PowerOn="1:0" />
+      <Function ID="1" Name="Raw DMX" Display="'Raw DMX %.f',0~255" Dmx="0~255" />
+    </Attribute>
+    <Attribute ID="Eyes" Name="Eyes" Description="Eyes / lights relay" Group="I">
+      <Locate Locate="2" PowerOn="1" />
+      <Function ID="1" Name="Off" Display="'Off'" Dmx="0~0" />
+      <Function ID="2" Name="On" Display="'On'" Dmx="255~255" />
+    </Attribute>
+    <Attribute ID="EyesOnMove" Name="Eyes On Move" Description="Eyes light while the head moves and for 5 s after it stops" Group="E">
+      <Locate Locate="1" PowerOn="1" />
+      <Function ID="1" Name="Off" Display="'Off'" Dmx="0~0" />
+      <Function ID="2" Name="On" Display="'On'" Dmx="255~255" />
+    </Attribute>
+    <Attribute ID="SoundOnMove" Name="Sound On Move" Description="A random sound when the head starts moving, at most one per sound plus 5 s" Group="E">
+      <Locate Locate="1" PowerOn="1" />
+      <Function ID="1" Name="Off" Display="'Off'" Dmx="0~0" />
+      <Function ID="2" Name="On" Display="'On'" Dmx="255~255" />
+    </Attribute>
+    <Attribute ID="RandomMode" Name="Random Mode" Description="Head turns to random points on its own" Group="E">
+      <Locate Locate="1" PowerOn="1" />
+      <Function ID="1" Name="Off" Display="'Off'" Dmx="0~0" />
+      <Function ID="2" Name="On" Display="'On'" Dmx="255~255" />
+    </Attribute>
+    <Attribute ID="RandomTime" Name="Random Interval" Description="Typical time between random turns, 0-10 s; each is 0.5-1.5x this" Group="E">
+      <Locate Locate="1:50" PowerOn="1:50" />
+      <Function ID="1" Name="Interval" Display="'%.1f s',0.0~10.0" Dmx="0~255" />
+    </Attribute>
+    <Attribute ID="Volume" Name="Volume" Description="Sound effects volume" Group="S">
+      <Locate Locate="1:80" PowerOn="1:80" />
+      <Function ID="1" Name="Volume" Display="'%.f%%',0~100" Dmx="0~255" />
+    </Attribute>
+    <Attribute ID="Sound1" Name="Sound 1" Description="Plays sound 1 when the channel rises" Group="S">
+      <Locate Locate="1" PowerOn="1" />
+      <Function ID="1" Name="Ready" Display="'Ready'" Dmx="0~0" />
+      <Function ID="2" Name="Play" Display="'Play'" Dmx="255~255" />
+    </Attribute>
+    <Attribute ID="Sound2" Name="Sound 2" Description="Plays sound 2 when the channel rises" Group="S">
+      <Locate Locate="1" PowerOn="1" />
+      <Function ID="1" Name="Ready" Display="'Ready'" Dmx="0~0" />
+      <Function ID="2" Name="Play" Display="'Play'" Dmx="255~255" />
+    </Attribute>
+    <Attribute ID="Sound3" Name="Sound 3" Description="Plays sound 3 when the channel rises" Group="S">
+      <Locate Locate="1" PowerOn="1" />
+      <Function ID="1" Name="Ready" Display="'Ready'" Dmx="0~0" />
+      <Function ID="2" Name="Play" Display="'Play'" Dmx="255~255" />
+    </Attribute>
+    <Attribute ID="Sound4" Name="Sound 4" Description="Plays sound 4 when the channel rises" Group="S">
+      <Locate Locate="1" PowerOn="1" />
+      <Function ID="1" Name="Ready" Display="'Ready'" Dmx="0~0" />
+      <Function ID="2" Name="Play" Display="'Play'" Dmx="255~255" />
+    </Attribute>
+    <Attribute ID="Spare13" Name="Channel 13" Description="Unassigned in the default mapping" Group="S">
+      <Locate Locate="1:0" PowerOn="1:0" />
+      <Function ID="1" Name="Raw DMX" Display="'Raw DMX %.f',0~255" Dmx="0~255" />
+    </Attribute>
+    <Attribute ID="Spare14" Name="Channel 14" Description="Unassigned in the default mapping" Group="S">
+      <Locate Locate="1:0" PowerOn="1:0" />
+      <Function ID="1" Name="Raw DMX" Display="'Raw DMX %.f',0~255" Dmx="0~255" />
+    </Attribute>
+    <Attribute ID="Spare15" Name="Channel 15" Description="Unassigned in the default mapping" Group="S">
+      <Locate Locate="1:0" PowerOn="1:0" />
+      <Function ID="1" Name="Raw DMX" Display="'Raw DMX %.f',0~255" Dmx="0~255" />
+    </Attribute>
+    <Attribute ID="Spare16" Name="Channel 16" Description="Unassigned in the default mapping" Group="S">
+      <Locate Locate="1:0" PowerOn="1:0" />
+      <Function ID="1" Name="Raw DMX" Display="'Raw DMX %.f',0~255" Dmx="0~255" />
+    </Attribute>
+  </Control>
+  <Mode Name="16 DMX, default mapping" Channels="16">
+    <Import PearlRef="" DiamondRef="" WysiwygRef="" />
+    <Physical>
+      <Bulb Type="" Lumens="" ColourTemp="" />
+      <Lens Name="" Degrees="" />
+      <Weight Kg="" />
+      <Size Height="" Width="" Depth="" />
+      <Focus Type="Fixed" PanMax="0" TiltMax="0" PanMaxSpeed="0" TiltMaxSpeed="0" />
+    </Physical>
+    <Include>
+      <Attribute ID="HeadDir" ChannelOffset="1" Wheel="2" />
+      <Attribute ID="Spare2" ChannelOffset="2" Wheel="13" />
+      <Attribute ID="Eyes" ChannelOffset="3" Wheel="1" />
+      <Attribute ID="EyesOnMove" ChannelOffset="4" Wheel="4" />
+      <Attribute ID="SoundOnMove" ChannelOffset="5" Wheel="5" />
+      <Attribute ID="RandomMode" ChannelOffset="6" Wheel="6" />
+      <Attribute ID="RandomTime" ChannelOffset="7" Wheel="7" />
+      <Attribute ID="Volume" ChannelOffset="8" Wheel="8" />
+      <Attribute ID="Sound1" ChannelOffset="9" Wheel="9" />
+      <Attribute ID="Sound2" ChannelOffset="10" Wheel="10" />
+      <Attribute ID="Sound3" ChannelOffset="11" Wheel="11" />
+      <Attribute ID="Sound4" ChannelOffset="12" Wheel="12" />
+      <Attribute ID="Spare13" ChannelOffset="13" Wheel="14" />
+      <Attribute ID="Spare14" ChannelOffset="14" Wheel="15" />
+      <Attribute ID="Spare15" ChannelOffset="15" Wheel="16" />
+      <Attribute ID="Spare16" ChannelOffset="16" Wheel="17" />
+    </Include>
+  </Mode>
+  <Macro>
+    <Macro Name="Head Stop">
+      <Set Channel="HeadDir:2" Delay="0" />
+    </Macro>
+    <Macro Name="Random On">
+      <Set Channel="RandomMode:2" Delay="0" />
+    </Macro>
+    <Macro Name="Random Off">
+      <Set Channel="RandomMode:1,HeadDir:2" Delay="0" />
+    </Macro>
+  </Macro>
+</Fixture>

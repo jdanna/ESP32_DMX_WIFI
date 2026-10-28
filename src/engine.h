@@ -24,8 +24,8 @@ struct EngineStatus {
   IPAddress artFrom;
   int16_t dmxValue[RELAY_COUNT];  // -1 when the input isn't live or the relay is unassigned
   int16_t artValue[RELAY_COUNT];
-  int16_t inDmx[RELAY_COUNT];     // raw values of the 8 input slots, -1 when the input isn't live
-  int16_t inArt[RELAY_COUNT];
+  int16_t inDmx[INPUT_COUNT];     // raw values of the input slots, -1 when the input isn't live
+  int16_t inArt[INPUT_COUNT];
   RelaySource source[RELAY_COUNT];
   uint8_t relayMask;
   bool manual;

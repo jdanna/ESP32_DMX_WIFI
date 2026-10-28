@@ -14,6 +14,17 @@ PlatformIO + Arduino-ESP32 3.x via pioarduino (ESP-IDF v5.5.5 underneath).
   (full flash at 0x0). After an animatronic build, copy `.pio/build/animatronic/firmware.bin` and
   `firmware.factory.bin` there. The version string is still 1.1.0.
 
+## Channels and settings
+
+- `INPUT_COUNT` (16) input channels per range, separate from `RELAY_COUNT` (8). Channel slots are 1-16, 0 = unassigned.
+- In the animatronic build each channel drives at most one output; `configMappingExclusive()` checks it on save.
+  New mappable outputs need a claim there, a key in `web.cpp`'s mapping check, and entries in the UI's
+  `chanKeysFrom()` / `outputGroups()` / save body.
+- New settings fields with non-zero defaults: zero them in `configLoad()` before applying the stored JSON, so
+  devices with saved settings don't get a default that collides with their mapping. Factory defaults reach
+  existing devices only through the Mapping page's Restore defaults (`GET /api/config?defaults=1`).
+- `g_cfgRev` bumps on every save and goes out in status, so open pages reload settings saved elsewhere.
+
 ## USB audio (animatronic)
 
 - `lib/usb_host_uac` is Espressif's UAC host driver v1.5.0, vendored. Its Kconfig values are `-D` flags in the

@@ -4,6 +4,7 @@
 #include "log.h"
 
 Config g_cfg;
+uint32_t g_cfgRev;
 
 static const char *NVS_NS = "dmxrelay";
 static const char *NVS_KEY = "cfg";
@@ -21,7 +22,11 @@ void configDefaults(Config &cfg) {
   cfg.wifiPass[0] = 0;
   for (int i = 0; i < SFX_COUNT; i++) cfg.sfxNames[i][0] = 0;
   for (int i = 0; i < RELAY_COUNT; i++) {
+#ifdef ANIMATRONIC
+    cfg.io.map[i] = 0;  // the default animatronic mapping uses the channels for other outputs
+#else
     cfg.io.map[i] = i + 1;
+#endif
     snprintf(cfg.relayNames[i], sizeof(cfg.relayNames[i]), "Relay %d", i + 1);
   }
 #ifdef ANIMATRONIC
@@ -152,6 +157,13 @@ void configToJson(const Config &cfg, JsonObject out, bool includeSecrets) {
   an["homeOnBoot"] = cfg.io.anim.homeOnBoot;
   an["random"] = cfg.io.anim.random;
   an["randomInterval"] = cfg.io.anim.randomIntervalMs;
+  an["randomChannel"] = cfg.io.anim.randomSlot;
+  an["randomTimeChannel"] = cfg.io.anim.randomTimeSlot;
+  an["eyesOnMove"] = cfg.io.anim.eyesOnMove;
+  an["soundOnMove"] = cfg.io.anim.soundOnMove;
+  an["eyesMoveChannel"] = cfg.io.anim.eyesMoveSlot;
+  an["soundMoveChannel"] = cfg.io.anim.soundMoveSlot;
+  an["centerChannel"] = cfg.io.anim.centerSlot;
   an["limitType"] = cfg.io.anim.limitNc ? "nc" : "no";
   an["swap"] = cfg.io.anim.swap;
   JsonArray fnMap = an["map"].to<JsonArray>();
@@ -261,7 +273,7 @@ bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkC
         return false;
       }
       for (int i = 0; i < RELAY_COUNT; i++) {
-        if (!readRanged(map[i], 0, RELAY_COUNT, n, "Relay channel", err)) {
+        if (!readRanged(map[i], 0, INPUT_COUNT, n, "Relay channel", err)) {
           if (!err.length()) err = "Relay channel missing";
           return false;
         }
@@ -286,6 +298,18 @@ bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkC
     if (an["random"].is<bool>()) c.io.anim.random = an["random"];
     if (readRanged(an["randomInterval"], 1000, 30000, n, "Random interval", err)) c.io.anim.randomIntervalMs = n;
     if (err.length()) return false;
+    if (readRanged(an["randomChannel"], 0, INPUT_COUNT, n, "Random mode channel", err)) c.io.anim.randomSlot = n;
+    if (err.length()) return false;
+    if (readRanged(an["randomTimeChannel"], 0, INPUT_COUNT, n, "Random interval channel", err)) c.io.anim.randomTimeSlot = n;
+    if (err.length()) return false;
+    if (an["eyesOnMove"].is<bool>()) c.io.anim.eyesOnMove = an["eyesOnMove"];
+    if (an["soundOnMove"].is<bool>()) c.io.anim.soundOnMove = an["soundOnMove"];
+    if (readRanged(an["eyesMoveChannel"], 0, INPUT_COUNT, n, "Eyes on move channel", err)) c.io.anim.eyesMoveSlot = n;
+    if (err.length()) return false;
+    if (readRanged(an["soundMoveChannel"], 0, INPUT_COUNT, n, "Sound on move channel", err)) c.io.anim.soundMoveSlot = n;
+    if (err.length()) return false;
+    if (readRanged(an["centerChannel"], 0, INPUT_COUNT, n, "Center channel", err)) c.io.anim.centerSlot = n;
+    if (err.length()) return false;
     if (!an["limitType"].isNull()) {
       const char *t = an["limitType"];
       if (!t || (strcmp(t, "no") && strcmp(t, "nc"))) {
@@ -302,7 +326,7 @@ bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkC
         return false;
       }
       for (int f = 0; f < ANIM_FN_COUNT; f++) {
-        if (!readRanged(fnMap[f], 0, RELAY_COUNT, n, "Animatronic channel", err)) {
+        if (!readRanged(fnMap[f], 0, INPUT_COUNT, n, "Animatronic channel", err)) {
           if (!err.length()) err = "Animatronic channel missing";
           return false;
         }
@@ -317,7 +341,7 @@ bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkC
       }
       c.io.anim.singleDir = strcmp(m, "single") == 0;
     }
-    if (readRanged(an["dirChannel"], 0, RELAY_COUNT, n, "Direction channel", err)) c.io.anim.dirSlot = n;
+    if (readRanged(an["dirChannel"], 0, INPUT_COUNT, n, "Direction channel", err)) c.io.anim.dirSlot = n;
     if (err.length()) return false;
     if (readRanged(an["center"], 1, 254, n, "Center value", err)) c.io.anim.center = n;
     if (err.length()) return false;
@@ -334,7 +358,7 @@ bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkC
     if (sx["usbAudio"].is<bool>()) c.usbAudio = sx["usbAudio"];
     if (readRanged(sx["volume"], 0, 100, n, "Volume", err)) c.io.sfx.volume = n;
     if (err.length()) return false;
-    if (readRanged(sx["volChannel"], 0, RELAY_COUNT, n, "Volume channel", err)) c.io.sfx.volSlot = n;
+    if (readRanged(sx["volChannel"], 0, INPUT_COUNT, n, "Volume channel", err)) c.io.sfx.volSlot = n;
     if (err.length()) return false;
     JsonArrayConst sxMap = sx["map"];
     if (!sxMap.isNull()) {
@@ -343,7 +367,7 @@ bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkC
         return false;
       }
       for (int i = 0; i < SFX_COUNT; i++) {
-        if (!readRanged(sxMap[i], 0, RELAY_COUNT, n, "Sound channel", err)) {
+        if (!readRanged(sxMap[i], 0, INPUT_COUNT, n, "Sound channel", err)) {
           if (!err.length()) err = "Sound channel missing";
           return false;
         }
@@ -366,9 +390,9 @@ bool configFromJson(Config &cfg, JsonObjectConst in, String &err, bool &networkC
 
 #ifdef ANIMATRONIC
 bool configMappingExclusive(const Config &cfg, String &err) {
-  const char *owner[RELAY_COUNT + 1] = {};
+  const char *owner[INPUT_COUNT + 1] = {};
   auto claim = [&](uint8_t slot, const char *name) {
-    if (!slot || slot > RELAY_COUNT) return true;
+    if (!slot || slot > INPUT_COUNT) return true;
     if (owner[slot]) {
       err = String("Channel ") + slot + " is assigned to both " + owner[slot] + " and " + name;
       return false;
@@ -383,6 +407,9 @@ bool configMappingExclusive(const Config &cfg, String &err) {
     return false;
   }
   if (!claim(an.map[FN_EYES], "eyes")) return false;
+  if (!claim(an.centerSlot, "center")) return false;
+  if (!claim(an.eyesMoveSlot, "eyes on move") || !claim(an.soundMoveSlot, "sound on move")) return false;
+  if (!claim(an.randomSlot, "random mode") || !claim(an.randomTimeSlot, "random interval")) return false;
   static const char *SOUND_NAMES[SFX_COUNT] = {"sound 1", "sound 2", "sound 3", "sound 4"};
   for (int i = 0; i < SFX_COUNT; i++)
     if (!claim(cfg.io.sfx.map[i], SOUND_NAMES[i])) return false;
@@ -409,6 +436,13 @@ void configLoad(Config &cfg) {
     logWarn("cfg", "Stored config is corrupt, using defaults");
     return;
   }
+  // Channels added after these settings were saved start unassigned instead of taking the
+  // defaults, which could land on channels the saved mapping already uses.
+  AnimSettings &an = cfg.io.anim;
+  an.randomSlot = an.randomTimeSlot = an.eyesMoveSlot = an.soundMoveSlot = an.centerSlot = 0;
+  // The channel range grew from 8 to 16, so a start address near the top no longer fits.
+  for (const char *k : {"dmx", "artnet"})
+    if (doc[k]["start"].is<int>() && doc[k]["start"].as<int>() > RANGE_MAX_START) doc[k]["start"] = RANGE_MAX_START;
   String err;
   bool changed;
   if (!configFromJson(cfg, doc.as<JsonObjectConst>(), err, changed)) {
@@ -422,6 +456,7 @@ void configLoad(Config &cfg) {
 }
 
 void configSave(const Config &cfg) {
+  g_cfgRev++;
   JsonDocument doc;
   configToJson(cfg, doc.to<JsonObject>(), true);
   String raw;

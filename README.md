@@ -6,7 +6,7 @@ DMX512 + Art-Net controlled 8-relay firmware for the Waveshare
 <img src="docs/status.png" width="72%"> <img src="docs/phone.png" width="25%">
 
 - PoE Ethernet (DHCP or static) + optional Wi-Fi
-- DMX on RS485 and Art-Net on UDP 6454, each mapped to an 8-channel range
+- DMX on RS485 and Art-Net on UDP 6454, each mapped to a 16-channel range
 - Live status, manual relay test, web firmware update
 - `http://dmx-relay.local/`
 
@@ -73,20 +73,46 @@ shares the settings storage, so switching builds keeps the network and DMX setup
 
 - **Status:** Left / Stop / Right (keys **← ↓ →**), Eyes (**↑**), Center (**Space**) drives back to center,
   Find center (**H**) re-homes, Random (**R**) with its interval slider, ignore travel limit, 4 sound slots with
-  upload, volume.
+  upload, volume, **Eyes on move** and **Sound on move**. A **Channels** card shows what each of the 16 channels
+  drives, with its live level and state. It follows mapping changes saved from any browser.
+- **Eyes on move:** the eyes light whenever the head moves and stay on 5 s after it stops, on top of the Eyes
+  control. **Sound on move:** a move starting plays a random loaded sound; the next can't play until 5 s after that
+  one ends. Both are saved with the settings and can be switched by their channels (on at the threshold), which
+  override the checkboxes while DMX or Art-Net is live, like the random channels.
+- **Center head** channel: rising above the threshold drives the head back to center, like the Center button.
+  Ignored in manual override.
 - **Random:** turns the head to random points within 80% of the max swing (now and then straight ahead), each
   turn 0.5–1.5× the interval after the last one finishes (slider 1–30 s, default 6 s). The eyes stay manual. It homes first
   if needed, waits for a move to finish, pauses in manual override, and Stop turns it off. Saved with the settings.
-- **Homing:** at power-up (2 s in, can be turned off) or on **Find center**, the head swings left, then right, each
-  swing 250 ms further from where it started, up to the **max swing** (default 2.5 s), until the center switch
+  Both can also be mapped to channels: **Random mode on/off** (on at the threshold) and **Random interval** (0–255 =
+  0–10 s). While DMX or Art-Net is live they override the toggle and slider, which then show the channel's value.
+  On signal loss they hold, or with **all off** hand control back to the page.
+- **Homing:** at power-up (2 s in, off by default) or on **Find center**, the head swings left, then right, each
+  swing 250 ms further from where it started, up to the **max swing** (default 2 s), until the center switch
   closes. If it's not found either way the head goes back to where it started. The last known position is saved,
   so after a restart homing first runs straight toward center, and searches the other side if it isn't there.
 - **Motor:** once homed, the head's position is tracked by run time and re-zeroed every time it passes center; a
   move stops at the max swing either side of center, and that direction stays blocked until it moves back. Before
   homing, a move stops after the max swing time. Direction changes pass through off and wait the reverse delay
-  (default 500 ms). Relays 1 and 2 are never on together.
-- **Mapping:** the 8 channels each drive one output (motor left/right or a single direction channel with center +
-  dead zone, eyes, sound 1–4, volume, relays 4–8). Choosing an output that's in use moves it.
+  (default 250 ms). Relays 1 and 2 are never on together.
+- **Mapping:** the 16 channels each drive one output (motor left/right or a single direction channel with center +
+  dead zone, center head, eyes, eyes on move, sound on move, random mode on/off, random interval, sound 1–4,
+  volume, relays 4–8). Choosing an output that's in use moves it. **Restore defaults** fills in the default mapping
+  and motor settings below; Save applies them.
+
+  | Ch | Default | Ch | Default |
+  |---|---|---|---|
+  | 1 | Motor direction (center 128, dead zone 20) | 7 | Random interval |
+  | 2 | — | 8 | Volume |
+  | 3 | Eyes / lights | 9–12 | Sound 1–4 |
+  | 4 | Eyes on move | 13–16 | — |
+  | 5 | Sound on move | | |
+  | 6 | Random mode on/off | | |
+
+  Other defaults: reverse delay 250 ms, max swing 2000 ms, home at startup off, swap left/right off. These are the
+  factory settings; a device with saved settings keeps them until you use Restore defaults.
+- **Avolites Titan personality** for this default mapping: `fixtures/avolites/ESP32 DMX Relay_Animatronic.d4`
+  (16 channels). Load it as a user personality, or open it in Personality Builder.
 - **Sounds:** uploads (WAV, MP3, …) are converted in the browser to mono 24 kHz and stored on the device (~70 s
   total). A channel rising above the threshold plays its sound.
 - **USB audio** (System page) makes the USB-C port a host, so USB serial stops working while it's on. The board

@@ -161,7 +161,7 @@ body[data-tab=status] footer { display: none; }
 .status-sub .mono { color: var(--text); }
 .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .status-grid > .card { display: flex; flex-direction: column; padding: 16px 18px; }
-.status-grid .card-head, .relays-card .card-head { margin-bottom: 10px; }
+.status-grid .card-head, .relays-card .card-head, .live-chan-card .card-head { margin-bottom: 10px; }
 .head-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
 
 /* ─── RELAY TILES ─────────────────────────────────────────── */
@@ -192,6 +192,26 @@ body[data-tab=status] footer { display: none; }
 .mbar i { position: absolute; inset: 0; border-radius: 4px; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 80ms linear; will-change: transform; }
 .mbar.art i { background: var(--art); }
 .mbar .thr { position: absolute; top: -3px; bottom: -3px; width: 1px; background: rgba(255,255,255,0.35); }
+
+/* ─── LIVE CHANNELS (status page) ─────────────────────────── */
+.live-chan-card { padding: 14px 18px; margin-bottom: 12px; }
+.live-chans { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; position: relative; }
+.lc {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  background: var(--surface2); border: 1px solid var(--border); border-top: 2px solid rgba(255,255,255,0.08);
+  border-radius: 12px; padding: 8px 10px; transition: border-color 0.2s, box-shadow 0.25s;
+}
+.lc.on { border-top-color: var(--accent); box-shadow: 0 0 28px rgba(var(--accent-rgb),0.12); }
+.lc.on.art { border-top-color: var(--art); box-shadow: 0 0 28px rgba(var(--art-rgb),0.12); }
+.lc-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.lc-state { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: var(--subtle); text-transform: uppercase; white-space: nowrap; }
+.lc.on .lc-state { color: var(--accent); }
+.lc.on.art .lc-state { color: var(--art); }
+.lc-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lc.unused .lc-name { color: var(--subtle); font-weight: 500; }
+.lc-addr { font-family: var(--mono); font-size: 10.5px; color: var(--subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.anim-random input[type=range]:disabled { opacity: 0.45; }
+.anim-move { display: flex; align-items: center; gap: 12px 28px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); position: relative; }
 
 /* ─── ANIMATRONIC ────────────────────────────────────────── */
 .anim-state { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 12px; position: relative; }
@@ -260,18 +280,20 @@ body[data-tab=status] footer { display: none; }
 .io-row > .switch { margin-top: 32px; }
 .art-switch input:checked + .track { background: var(--art); border-color: var(--art); box-shadow: 0 0 18px rgba(var(--art-rgb),0.3); }
 .card-note { font-size: 12px; color: var(--subtle); text-align: right; }
-.chan { display: flex; flex-direction: column; position: relative; }
+/* 16 channels in two columns: 1-8 down the left, 9-16 down the right. */
+.chan { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(8, auto); grid-auto-flow: column; column-gap: 32px; position: relative; }
 .chan-row {
-  display: grid; grid-template-columns: 36px 150px 1fr 34px minmax(200px, 280px); grid-template-areas: "num addr bar val sel";
-  gap: 14px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);
+  display: grid; grid-template-columns: 32px auto 1fr 34px; grid-template-areas: "num sel sel sel" "num addr bar val";
+  gap: 6px 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border);
 }
-.chan-row:last-child { border-bottom: 0; padding-bottom: 0; }
-.chan-row:first-child { padding-top: 0; }
+.chan-row:nth-child(8), .chan-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.chan-row:first-child, .chan-row:nth-child(9) { padding-top: 0; }
+.chan-row .chan-num { align-self: start; margin-top: 8px; }
 .chan-num { grid-area: num; font-family: var(--mono); font-size: 13px; font-weight: 700; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; text-align: center; padding: 2px 0; }
 .chan-addr { grid-area: addr; font-family: var(--mono); font-size: 11.5px; color: var(--subtle); white-space: nowrap; }
 .chan-row .mbar { grid-area: bar; }
 .chan-val { grid-area: val; font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--muted); text-align: right; }
-.chan-row select.input { grid-area: sel; min-height: 40px; padding: 8px 36px 8px 12px; font-size: 14px; }
+.chan-row select.input { grid-area: sel; min-height: 38px; padding: 7px 36px 7px 12px; font-size: 14px; }
 .chan-row.unused select.input { color: var(--subtle); }
 .fields.fields-3 { grid-template-columns: 1fr 1fr 1fr; }
 .motor-opts { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 18px; position: relative; }
@@ -328,6 +350,7 @@ select.input {
 .switch input:checked + .track { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 18px rgba(var(--accent-rgb),0.3); }
 .switch input:checked + .track::after { left: 20px; background: #000; }
 .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch:has(input:disabled) { cursor: default; opacity: 0.6; }
 .card.art .switch input:checked + .track { background: var(--art); border-color: var(--art); box-shadow: 0 0 18px rgba(var(--art-rgb),0.3); }
 .warn-switch input:checked + .track { background: var(--warn); border-color: var(--warn); box-shadow: 0 0 18px rgba(var(--warn-rgb),0.3); }
 
@@ -449,7 +472,10 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
 @media (max-width: 960px) {
   .grid-2, .status-grid { grid-template-columns: 1fr; }
   .relays { grid-template-columns: repeat(4, 1fr); }
-  .chan-row { grid-template-columns: 36px 130px 1fr 34px minmax(160px, 230px); }
+  .chan { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-flow: row; }
+  .chan-row:nth-child(8) { border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .chan-row:nth-child(9) { padding-top: 10px; }
+  .live-chans { grid-template-columns: repeat(4, 1fr); }
 }
 @media (max-width: 760px) {
   :root { --nav-h: 56px; --tabbar-h: 64px; }
@@ -475,7 +501,9 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
   .status-sub { display: none; }
   .status-bar { margin-bottom: 12px; }
   .status-grid { gap: 12px; margin-bottom: 12px; }
-  .status-grid > .card, .relays-card { padding: 14px; }
+  .status-grid > .card, .relays-card, .live-chan-card { padding: 14px; }
+  .live-chans { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .lc { padding: 8px; gap: 5px; }
   .anim-state { font-size: 19px; margin-bottom: 10px; }
   .arrow { min-height: 70px; }
   .arrow.mid { min-height: 40px; }
@@ -488,7 +516,6 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
   .io-row { grid-template-columns: 1fr 1fr; }
   .io-row > .switch { grid-column: 1 / -1; margin-top: 0; }
   .card-note { display: none; }
-  .chan-row { grid-template-columns: 32px 1fr auto; grid-template-areas: "num addr val" "num bar bar" "sel sel sel"; gap: 6px 12px; padding: 10px 0; }
   .names { grid-template-columns: 1fr; }
   .map-row { grid-template-columns: 36px 1fr; }
   .map-row .input { grid-column: 2; }
@@ -571,6 +598,10 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
         <input id="randomInterval" type="range" min="1" max="30" step="0.5" aria-label="Random interval" title="Typical time between changes; each one comes at a random time from half to one and a half times this">
         <span class="mono" id="randomVal"></span>
       </div>
+      <div class="anim-move">
+        <label class="switch" title="Light the eyes whenever the head moves, and for 5 s after it stops"><input type="checkbox" id="eyesMoveToggle"><span class="track"></span>Eyes on move</label>
+        <label class="switch" title="Play a random sound when the head starts moving. After a sound, the next waits until 5 s after it ends"><input type="checkbox" id="soundMoveToggle"><span class="track"></span>Sound on move</label>
+      </div>
     </div>
 
     <div class="card" id="sfxCard">
@@ -582,6 +613,14 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
       <div class="vol-row"><span class="label">Volume</span><input id="volume" type="range" min="0" max="100" aria-label="Volume"><span class="mono" id="volVal"></span><button class="btn btn-secondary btn-sm" type="button" id="toneBtn" title="Three seconds of 440 Hz at a fixed level, ignoring the volume and the sound files">Test tone</button></div>
       <p class="sfx-foot" id="sfxStorage"></p>
     </div>
+  </div>
+
+  <div class="card live-chan-card" id="liveChanCard" hidden>
+    <div class="card-head">
+      <span class="card-title">Channels</span>
+      <span class="card-note" id="liveChanNote">Assigned on the Mapping page</span>
+    </div>
+    <div class="live-chans" id="liveChans"></div>
   </div>
 
   <div class="card relays-card">
@@ -603,7 +642,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
 <section class="page" id="page-mapping">
   <div class="hero compact">
     <h1><span class="gradient-text">Mapping</span></h1>
-    <p class="hero-sub" id="mapSub">DMX and Art-Net feed the same 8 channels. Changes apply when saved.</p>
+    <p class="hero-sub" id="mapSub">DMX and Art-Net feed the same 16 channels. Changes apply when saved.</p>
   </div>
 
   <div class="grid-2">
@@ -614,7 +653,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
           <label class="switch"><input type="checkbox" id="dmxEnabled" data-dirty><span class="track"></span>DMX</label>
           <div class="field">
             <label for="dmxStart">Start address</label>
-            <input class="input mono" id="dmxStart" type="number" inputmode="numeric" min="1" max="505" data-dirty>
+            <input class="input mono" id="dmxStart" type="number" inputmode="numeric" min="1" max="497" data-dirty>
             <span class="hint" id="dmxRange"></span>
           </div>
         </div>
@@ -627,7 +666,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
           </div>
           <div class="field">
             <label for="artStart">Start channel</label>
-            <input class="input mono" id="artStart" type="number" inputmode="numeric" min="1" max="505" data-dirty>
+            <input class="input mono" id="artStart" type="number" inputmode="numeric" min="1" max="497" data-dirty>
             <span class="hint" id="artRange"></span>
           </div>
         </div>
@@ -670,7 +709,9 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
   </div>
 
   <div class="card section-gap" id="chanCard" hidden>
-    <div class="card-head"><span class="card-title">Channels</span><span class="card-note">One output per channel · choosing an output that's in use moves it here</span></div>
+    <div class="card-head"><span class="card-title">Channels</span>
+      <div class="head-tools"><span class="card-note">One output per channel · choosing an output that's in use moves it here</span>
+        <button class="btn btn-secondary btn-sm" type="button" id="mapDefaults" title="Fill in the default channel mapping and motor settings. Nothing changes until you Save">Restore defaults</button></div></div>
     <div class="chan" id="chanTable"></div>
   </div>
 
@@ -901,6 +942,7 @@ footer { border-top: 1px solid var(--border); padding: 28px 40px; text-align: ce
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const pad3 = n => String(n).padStart(3, '0');
+const CH = 16;  // input channels in the DMX / Art-Net range
 let cfg = null, st = null, dirty = false, polling = null, offline = false;
 
 // ─── API ───────────────────────────────────────────────────
@@ -1016,6 +1058,7 @@ function renderLive() {
   });
   renderAnim();
   renderSfx();
+  renderLiveChans();
   if ($('#page-mapping').classList.contains('active')) renderChanLevels();
 }
 
@@ -1038,12 +1081,28 @@ function renderAnim() {
   else if (a.reason === 'homed') text = 'Centered';
   else if (a.reason === 'homeFailed') text = 'Center not found';
   else text = 'Stopped';
-  const randomCfg = !!(cfg && cfg.anim.random);
+  // Random on/off and its interval can come from their channels, which override the controls here.
+  const randomOn = a.randomOn !== undefined ? a.randomOn : !!(cfg && cfg.anim.random);
   if (a.random) text = 'Random · ' + text;
-  else if (randomCfg) text += ' · random paused (manual override)';
+  else if (randomOn) text += ' · random paused (manual override)';
   $('#animState').textContent = text;
-  $('#randomToggle').checked = randomCfg;
-  if (cfg && !randomDragging) setRandomLabel(cfg.anim.randomInterval / 1000);
+  const tog = $('#randomToggle');
+  tog.checked = randomOn;
+  tog.disabled = !!a.randomFromInput;
+  tog.closest('.switch').title = a.randomFromInput ? `Set by channel ${cfg ? cfg.anim.randomChannel : ''}`
+    : 'Turn the head at random. Stop turns it off';
+  const rint = $('#randomInterval');
+  rint.disabled = !!a.randomIntervalFromInput;
+  const ms = a.randomInterval !== undefined ? a.randomInterval : cfg && cfg.anim.randomInterval;
+  if (ms !== undefined && !randomDragging) setRandomLabel(ms / 1000, a.randomIntervalFromInput && cfg ? cfg.anim.randomTimeChannel : 0);
+  for (const [id, key, chKey] of [['#eyesMoveToggle', 'eyesOnMove', 'eyesMoveChannel'], ['#soundMoveToggle', 'soundOnMove', 'soundMoveChannel']]) {
+    const t = $(id), fromInput = !!a[key + 'FromInput'];
+    t.checked = a[key] !== undefined ? a[key] : !!(cfg && cfg.anim[key]);
+    t.disabled = fromInput;
+    const sw = t.closest('.switch');
+    if (!sw.dataset.title) sw.dataset.title = sw.title;
+    sw.title = fromInput ? `Set by channel ${cfg ? cfg.anim[chKey] : ''}` : sw.dataset.title;
+  }
   const side = a.pos < 0 ? 'left' : 'right', off = Math.abs(a.pos) / 1000;
   $('#animPos').textContent = a.home === 'ok' ? (off < 0.05 ? 'At center' : `${off.toFixed(1)} s ${side} of center`)
     : a.home === 'searching' ? 'Swinging wider until the center switch closes'
@@ -1063,12 +1122,105 @@ function renderAnim() {
 }
 
 let sfxNamesSig = null;
+let cfgRevSeen = null, cfgReloading = false;
+
+async function reloadConfig() {
+  cfgReloading = true;
+  try {
+    cfg = await api('/api/config');
+    if (!dirty) fillMapping();  // don't throw away unsaved edits on the Mapping page
+    renderStatus();
+  } catch (e) {
+    // the next status update tries again
+    cfgRevSeen = null;
+  } finally {
+    cfgReloading = false;
+  }
+}
+
+// ─── LIVE CHANNELS ─────────────────────────────────────────
+// Status page: what each of the 8 input channels drives (from the saved settings) and its live level.
+const OUTPUT_LABELS = { left: 'Motor left', right: 'Motor right', dir: 'Motor direction', center: 'Center head',
+  eyes: 'Eyes / lights', eyesmove: 'Eyes on move', soundmove: 'Sound on move', random: 'Random mode',
+  rtime: 'Random interval', vol: 'Volume' };
+let liveChanKeys = Array(CH).fill('');
+
+function buildLiveChans() {
+  const wrap = $('#liveChans');
+  for (let i = 0; i < CH; i++) {
+    const el = document.createElement('div');
+    el.className = 'lc unused';
+    el.innerHTML = `<div class="lc-top"><span class="relay-num">CH ${i + 1}</span><span class="lc-state"></span></div>
+      <div class="lc-name">Unassigned</div><div class="mbar"><i></i><span class="thr"></span></div><div class="lc-addr"></div>`;
+    wrap.append(el);
+  }
+}
+
+function setText(el, t) { if (el.textContent !== t) el.textContent = t; }
+
+function renderLiveChanLabels() {
+  if (!cfg || $('#liveChanCard').hidden) return;
+  liveChanKeys = chanKeysFrom(cfg);
+  $$('#liveChans .lc').forEach((el, i) => {
+    const key = liveChanKeys[i];
+    let name = 'Unassigned';
+    if (key.startsWith('sfx')) name = '♪ ' + sfxName(+key.slice(3));
+    else if (key.startsWith('relay')) {
+      const r = +key.slice(5), plain = `Relay ${r + 1}`, n = cfg.relays.names[r];
+      name = n && n !== plain ? `${plain} · ${n}` : plain;
+    } else if (key) name = OUTPUT_LABELS[key];
+    setText($('.lc-name', el), name);
+    el.classList.toggle('unused', !key);
+    const t = $('.thr', el);
+    t.hidden = !usesThreshold(key);
+    t.style.left = (cfg.relays.threshold / 2.55) + '%';
+  });
+}
+
+function renderLiveChans() {
+  if (!cfg || !st || $('#liveChanCard').hidden) return;
+  const thr = cfg.relays.threshold, ds = cfg.dmx.start, as = cfg.artnet.start;
+  $$('#liveChans .lc').forEach((el, i) => {
+    const key = liveChanKeys[i];
+    const d = st.inputs ? st.inputs.dmx[i] : -1, a = st.inputs ? st.inputs.art[i] : -1;
+    const v = d >= 0 ? d : a, art = d < 0 && a >= 0;
+    let state = '', on = false;
+    if (key && v >= 0) {
+      if (key === 'dir') {
+        const c = cfg.anim.center, z = cfg.anim.deadZone;
+        state = v < c - z ? 'left' : v > c + z ? 'right' : 'stop';
+        on = state !== 'stop';
+      } else if (key === 'vol') state = Math.round(v * 100 / 255) + '%';
+      else if (key === 'rtime') state = (v * 10 / 255).toFixed(1) + ' s';
+      else {
+        on = v >= thr;
+        state = on ? 'on' : 'off';
+      }
+    } else if (key) state = '—';
+    el.classList.toggle('on', on);
+    el.classList.toggle('art', art);
+    setText($('.lc-state', el), state);
+    const bar = $('.mbar', el);
+    bar.classList.toggle('art', art);
+    $('i', bar).style.transform = `scaleX(${v >= 0 ? v / 255 : 0})`;
+    const addr = cfg.dmx.enabled || !cfg.artnet.enabled ? `DMX ${pad3(ds + i)}` : `ART ${pad3(as + i)}`;
+    setText($('.lc-addr', el), addr + (v >= 0 ? ` · ${v}` : ''));
+    el.title = `DMX ${pad3(ds + i)} · Art-Net ${pad3(as + i)}`;
+  });
+}
 
 function renderStatus() {
   if (!st) return;
   const c = cfg;
   const animBuild = st.variant === 'animatronic';
   $('#statusGrid').hidden = !animBuild;
+  $('#liveChanCard').hidden = !animBuild;
+  // Settings saved from another page or browser: reload them so labels and controls follow.
+  if (st.cfgRev !== undefined) {
+    if (cfgRevSeen !== null && st.cfgRev !== cfgRevSeen && !cfgReloading) reloadConfig();
+    cfgRevSeen = st.cfgRev;
+  }
+  renderLiveChanLabels();
   renderLive();
   $('#navHost').textContent = st.hostname + '.local';
   $('#footFw').textContent = 'v' + st.fw;
@@ -1092,9 +1244,9 @@ function renderStatus() {
     const sub = $('#statusSub');
     sub.replaceChildren();
     const m = t => { const el = document.createElement('span'); el.className = 'mono'; el.textContent = t; return el; };
-    if (c.dmx.enabled) sub.append('DMX ', m(`${pad3(c.dmx.start)}–${pad3(c.dmx.start + 7)}`));
+    if (c.dmx.enabled) sub.append('DMX ', m(`${pad3(c.dmx.start)}–${pad3(c.dmx.start + CH - 1)}`));
     if (c.dmx.enabled && c.artnet.enabled) sub.append(' · ');
-    if (c.artnet.enabled) sub.append('Art-Net ', m(`U${c.artnet.universe} ${pad3(c.artnet.start)}–${pad3(c.artnet.start + 7)}`));
+    if (c.artnet.enabled) sub.append('Art-Net ', m(`U${c.artnet.universe} ${pad3(c.artnet.start)}–${pad3(c.artnet.start + CH - 1)}`));
     if (!c.dmx.enabled && !c.artnet.enabled) sub.append('Both inputs are disabled');
     else sub.append(' · on at ', m('≥ ' + c.relays.threshold));
   }
@@ -1124,14 +1276,14 @@ $('#eyesToggle').addEventListener('change', e => {
 });
 // Random mode lives in the settings so it survives a restart.
 let randomDragging = false;
-function setRandomLabel(s) {
+function setRandomLabel(s, fromChannel) {
   const r = $('#randomInterval');
   r.value = s;
-  r.style.setProperty('--p', ((s - r.min) / (r.max - r.min) * 100) + '%');
+  r.style.setProperty('--p', ((Math.max(+r.min, s) - r.min) / (r.max - r.min) * 100) + '%');
   const f = v => (Math.round(v * 10) / 10) + '';
-  $('#randomVal').textContent = `~${f(s)} s (${f(s / 2)}–${f(s * 1.5)})`;
+  $('#randomVal').textContent = (fromChannel ? `ch ${fromChannel} · ` : '') + `~${f(s)} s (${f(s / 2)}–${f(s * 1.5)})`;
 }
-async function setRandom(anim) {
+async function setAnimCfg(anim) {
   try {
     cfg = (await api('/api/config', { anim })).config;
     renderAnim();
@@ -1139,18 +1291,20 @@ async function setRandom(anim) {
     toast(err.message, true);
   }
 }
-$('#randomToggle').addEventListener('change', e => setRandom({ random: e.target.checked }));
+$('#randomToggle').addEventListener('change', e => setAnimCfg({ random: e.target.checked }));
+$('#eyesMoveToggle').addEventListener('change', e => setAnimCfg({ eyesOnMove: e.target.checked }));
+$('#soundMoveToggle').addEventListener('change', e => setAnimCfg({ soundOnMove: e.target.checked }));
 $('#randomInterval').addEventListener('input', e => {
   randomDragging = true;
   setRandomLabel(+e.target.value);
 });
 $('#randomInterval').addEventListener('change', async e => {
-  await setRandom({ randomInterval: Math.round(+e.target.value * 1000) });
+  await setAnimCfg({ randomInterval: Math.round(+e.target.value * 1000) });
   randomDragging = false;
 });
 // Stop means stop everything, random mode included.
 function motorCommand(motor) {
-  if (motor === 'stop' && cfg && cfg.anim.random) setRandom({ random: false });
+  if (motor === 'stop' && cfg && cfg.anim.random) setAnimCfg({ random: false });
   api('/api/anim', { motor }).catch(err => toast(err.message, true));
 }
 
@@ -1356,7 +1510,9 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'r' || e.key === 'R') {
-    if (!e.repeat && cfg) setRandom({ random: !cfg.anim.random });
+    if (e.repeat || !cfg) return;
+    if (st.anim.randomFromInput) toast(`Random mode is set by channel ${cfg.anim.randomChannel}`);
+    else setAnimCfg({ random: !cfg.anim.random });
     return;
   }
   if (!motor && e.key !== 'ArrowUp') return;
@@ -1458,8 +1614,12 @@ function applyLive(l) {
   if (l.id) st.inputs = { dmx: l.id, art: l.ia };
   if (l.sx && st.sfx) [st.sfx.playing, st.sfx.volume, st.sfx.volumeFromInput] = l.sx;
   if (l.an) {
-    const [dir, target, atLimit, reason, center, closed, override, eyes, home, pos, centering, random] = l.an;
-    st.anim = { dir: DIRS[dir], target: DIRS[target], atLimit: DIRS[atLimit], reason: REASONS[reason], center, closed, override, eyes, home: HOMES[home], pos, centering, random };
+    const [dir, target, atLimit, reason, center, closed, override, eyes, home, pos, centering, random,
+      randomOn, randomFromInput, randomInterval, randomIntervalFromInput,
+      eyesOnMove, eyesOnMoveFromInput, soundOnMove, soundOnMoveFromInput] = l.an;
+    st.anim = { dir: DIRS[dir], target: DIRS[target], atLimit: DIRS[atLimit], reason: REASONS[reason], center, closed, override, eyes, home: HOMES[home], pos, centering, random,
+      randomOn, randomFromInput, randomInterval, randomIntervalFromInput,
+      eyesOnMove, eyesOnMoveFromInput, soundOnMove, soundOnMoveFromInput };
   }
 }
 
@@ -1518,11 +1678,11 @@ function buildMap() {
   }
 }
 
-// Animatronic build: each of the 8 channels drives at most one output.
-let chan = Array(8).fill('');
+// Animatronic build: each of the 16 channels drives at most one output.
+let chan = Array(CH).fill('');
 const slotOf = key => chan.indexOf(key) + 1;
 // Direction and volume use the channel's whole range; everything else switches at the threshold.
-const usesThreshold = key => key && key !== 'dir' && key !== 'vol';
+const usesThreshold = key => !!key && !['dir', 'vol', 'rtime'].includes(key);
 
 function sfxName(i) {
   const slot = st && st.sfx && st.sfx.slots[i];
@@ -1539,7 +1699,8 @@ function outputGroups() {
     ? [['dir', 'Motor direction']]
     : [['left', 'Motor left'], ['right', 'Motor right']];
   return [
-    ['Animatronic', [...motor, ['eyes', 'Eyes / lights']]],
+    ['Animatronic', [...motor, ['center', 'Center head'], ['eyes', 'Eyes / lights'], ['eyesmove', 'Eyes on move on/off'],
+      ['soundmove', 'Sound on move on/off'], ['random', 'Random mode on/off'], ['rtime', 'Random interval 0–10 s']]],
     ['Sound', [...[0, 1, 2, 3].map(i => ['sfx' + i, '♪ ' + sfxName(i)]), ['vol', 'Volume']]],
     ['Relays', [3, 4, 5, 6, 7].map(i => {
       const name = relayName(i), plain = `Relay ${i + 1}`;
@@ -1550,7 +1711,7 @@ function outputGroups() {
 
 function buildChan() {
   const wrap = $('#chanTable');
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < CH; i++) {
     const row = document.createElement('div');
     row.className = 'chan-row';
     row.innerHTML = `<span class="chan-num">${i + 1}</span><span class="chan-addr"></span>
@@ -1575,19 +1736,26 @@ function buildChan() {
 }
 
 // Settings saved before mapping was exclusive may share a channel; the first output listed wins.
-function chanFromConfig() {
-  chan = Array(8).fill('');
-  const put = (slot, key) => { if (slot >= 1 && slot <= 8 && !chan[slot - 1]) chan[slot - 1] = key; };
-  if (cfg.anim.motorMode === 'single') put(cfg.anim.dirChannel, 'dir');
-  else { put(cfg.anim.map[0], 'left'); put(cfg.anim.map[1], 'right'); }
-  put(cfg.anim.map[2], 'eyes');
-  cfg.sfx.map.forEach((slot, i) => put(slot, 'sfx' + i));
-  put(cfg.sfx.volChannel, 'vol');
-  for (let i = 3; i < 8; i++) put(cfg.relays.map[i], 'relay' + i);
+function chanKeysFrom(c) {
+  const keys = Array(CH).fill('');
+  const put = (slot, key) => { if (slot >= 1 && slot <= CH && !keys[slot - 1]) keys[slot - 1] = key; };
+  if (c.anim.motorMode === 'single') put(c.anim.dirChannel, 'dir');
+  else { put(c.anim.map[0], 'left'); put(c.anim.map[1], 'right'); }
+  put(c.anim.map[2], 'eyes');
+  put(c.anim.centerChannel, 'center');
+  put(c.anim.eyesMoveChannel, 'eyesmove');
+  put(c.anim.soundMoveChannel, 'soundmove');
+  put(c.anim.randomChannel, 'random');
+  put(c.anim.randomTimeChannel, 'rtime');
+  c.sfx.map.forEach((slot, i) => put(slot, 'sfx' + i));
+  put(c.sfx.volChannel, 'vol');
+  for (let i = 3; i < 8; i++) put(c.relays.map[i], 'relay' + i);
+  return keys;
 }
+function chanFromConfig() { chan = chanKeysFrom(cfg); }
 
 function renderChan() {
-  const ds = clampInt($('#dmxStart').value, 1, 505, 1), as = clampInt($('#artStart').value, 1, 505, 1);
+  const ds = clampInt($('#dmxStart').value, 1, 512 - CH + 1, 1), as = clampInt($('#artStart').value, 1, 512 - CH + 1, 1);
   const groups = outputGroups();
   $$('.chan-row').forEach((row, i) => {
     $('.chan-addr', row).textContent = `DMX ${pad3(ds + i)} · ART ${pad3(as + i)}`;
@@ -1667,15 +1835,15 @@ $('#motorMode').addEventListener('change', () => {
 });
 
 function refreshRangeLabels() {
-  const ds = clampInt($('#dmxStart').value, 1, 505, 1), as = clampInt($('#artStart').value, 1, 505, 1);
+  const ds = clampInt($('#dmxStart').value, 1, 512 - CH + 1, 1), as = clampInt($('#artStart').value, 1, 512 - CH + 1, 1);
   const u = clampInt($('#artUniverse').value, 0, 32767, 0);
-  $('#dmxRange').textContent = `Channels ${pad3(ds)}–${pad3(ds + 7)}`;
-  $('#artRange').textContent = `Channels ${pad3(as)}–${pad3(as + 7)}`;
+  $('#dmxRange').textContent = `Channels ${pad3(ds)}–${pad3(ds + CH - 1)}`;
+  $('#artRange').textContent = `Channels ${pad3(as)}–${pad3(as + CH - 1)}`;
   $('#artNsu').textContent = `Net ${u >> 8} · Sub-Net ${(u >> 4) & 15} · Universe ${u & 15}`;
   $$('[data-map]').forEach(sel => {
     const cur = sel.value;
     sel.replaceChildren(new Option('Unassigned', '0'));
-    for (let s = 1; s <= 8; s++) sel.append(new Option(`Ch ${s}  ·  DMX ${pad3(ds + s - 1)}  ·  Art ${pad3(as + s - 1)}`, String(s)));
+    for (let s = 1; s <= CH; s++) sel.append(new Option(`Ch ${s}  ·  DMX ${pad3(ds + s - 1)}  ·  Art ${pad3(as + s - 1)}`, String(s)));
     sel.value = cur || '0';
   });
   const t = clampInt($('#thresholdNum').value, 1, 255, 128);
@@ -1729,17 +1897,38 @@ $('#page-mapping').addEventListener('change', () => {
   setDirty(true);
 });
 $('#mapRevert').addEventListener('click', fillMapping);
+$('#mapDefaults').addEventListener('click', async () => {
+  try {
+    const d = await api('/api/config?defaults=1');
+    const saved = cfg;
+    // Defaults for the channel mapping and motor settings; addresses, threshold, names and
+    // the Status page toggles stay as they are.
+    cfg = {
+      ...saved,
+      relays: { ...saved.relays, map: d.relays.map },
+      anim: { ...d.anim, random: saved.anim.random, randomInterval: saved.anim.randomInterval,
+        eyesOnMove: saved.anim.eyesOnMove, soundOnMove: saved.anim.soundOnMove },
+      sfx: { ...saved.sfx, map: d.sfx.map, volChannel: d.sfx.volChannel },
+    };
+    try { fillMapping(); } finally { cfg = saved; }
+    syncMotorMode();
+    setDirty(true);
+    toast('Defaults filled in · Save to apply');
+  } catch (e) {
+    toast(e.message, true);
+  }
+});
 
 $('#mapSave').addEventListener('click', async () => {
   const animBuild = st && st.variant === 'animatronic';
   const single = segValue($('#motorMode')) === 'single';
   const range = n => [...Array(n).keys()];
   const body = {
-    dmx: { enabled: $('#dmxEnabled').checked, start: clampInt($('#dmxStart').value, 1, 505, 1) },
+    dmx: { enabled: $('#dmxEnabled').checked, start: clampInt($('#dmxStart').value, 1, 512 - CH + 1, 1) },
     artnet: {
       enabled: $('#artEnabled').checked,
       universe: clampInt($('#artUniverse').value, 0, 32767, 0),
-      start: clampInt($('#artStart').value, 1, 505, 1),
+      start: clampInt($('#artStart').value, 1, 512 - CH + 1, 1),
     },
     relays: {
       threshold: clampInt($('#thresholdNum').value, 1, 255, 128),
@@ -1767,6 +1956,11 @@ $('#mapSave').addEventListener('click', async () => {
   if (animBuild) {
     body.anim.map = [single ? 0 : slotOf('left'), single ? 0 : slotOf('right'), slotOf('eyes')];
     body.anim.dirChannel = single ? slotOf('dir') : 0;
+    body.anim.randomChannel = slotOf('random');
+    body.anim.randomTimeChannel = slotOf('rtime');
+    body.anim.centerChannel = slotOf('center');
+    body.anim.eyesMoveChannel = slotOf('eyesmove');
+    body.anim.soundMoveChannel = slotOf('soundmove');
     body.sfx = { map: range(4).map(i => slotOf('sfx' + i)), volChannel: slotOf('vol') };
   }
   const btn = $('#mapSave');
@@ -2082,6 +2276,7 @@ buildRelays();
 buildMap();
 buildChan();
 buildSfx();
+buildLiveChans();
 showTab(location.hash.slice(1) || 'status');
 loadConfig().then(startLive);
 loadLog();

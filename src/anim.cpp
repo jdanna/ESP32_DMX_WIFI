@@ -15,6 +15,7 @@ constexpr int32_t SAVE_MIN_CHANGE_MS = 20;   // ...and it moved at least this mu
 const char *NVS_NS = "anim", *NVS_POS = "pos";
 constexpr int32_t RANDOM_REACH_PCT = 80;     // random targets stay within this much of the max swing
 constexpr uint32_t RANDOM_START_MS = 500;    // first random change this soon after turning it on
+constexpr uint32_t EYES_HOLD_MS = 5000;      // eyes on move: stay lit this long after the head stops
 
 const char *DIR_NAMES[] = {"stop", "left", "right"};
 const char *REASON_NAMES[] = {nullptr, "user", "travel", "timeout", "input", "homed", "homeFailed"};
@@ -36,7 +37,7 @@ SaveOp saveOp = SAVE_NONE;
 
 // Owned by the engine task.
 MotorDir dir = MOTOR_STOP, lastMoveDir = MOTOR_STOP;
-uint32_t stopMs, runStartMs, rawSince, lastMs, idleSince;
+uint32_t stopMs, runStartMs, rawSince, lastMs, idleSince, moveEyesUntil;
 bool rawPrev, closed, centerPrev, bootHomeChecked;
 uint8_t inputPrev;
 // Driving back to center once homed; stops at the switch, or gives up this far past it.
@@ -345,7 +346,8 @@ uint8_t animUpdate(uint32_t now, const AnimSettings &s, uint8_t inputMask, bool 
   }
 
   st = {dir, target, limitDir(), reason, center, closed, override, eyes, home, posKnown ? posMs : 0, centering, randomOn};
-  const bool eyesOn = eyes;
+  if (dir != MOTOR_STOP || target != MOTOR_STOP) moveEyesUntil = now + EYES_HOLD_MS;  // moving, or about to
+  const bool eyesOn = eyes || (s.eyesOnMove && (int32_t)(moveEyesUntil - now) > 0);
   const uint8_t ev = events;
   events = 0;
   const int32_t saved = savedPos;

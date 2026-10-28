@@ -11,6 +11,9 @@
 //
 // Random mode turns the head to random points within the travel, at random
 // intervals around the configured time. It doesn't touch the eyes.
+//
+// Eyes on move (a setting) also lights the eyes while the head moves and for a few
+// seconds after, on top of whatever the eyes control says.
 #pragma once
 
 #include <Arduino.h>
@@ -35,6 +38,13 @@ struct AnimStatus {
   int32_t posMs;     // run time from center, left negative; meaningful once homed
   bool centering;    // driving back to center
   bool random;       // random mode running (on, and not paused by manual override)
+  // Filled in by the engine, which applies the random mode channels:
+  bool randomOn;          // random mode wanted, by the setting or its channel (may be paused)
+  bool randomFromInput;   // on/off comes from its channel
+  uint16_t randomMs;      // interval in use
+  bool randomMsFromInput; // interval comes from its channel
+  bool eyesOnMove, eyesOnMoveFromInput;    // in effect, and whether its channel set it
+  bool soundOnMove, soundOnMoveFromInput;
 };
 
 void animBegin();

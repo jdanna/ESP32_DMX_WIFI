@@ -14,6 +14,7 @@ constexpr uint16_t OP_POLL_REPLY = 0x2100;
 constexpr uint16_t OP_DMX = 0x5000;
 constexpr uint32_t REFRESH_MS = 1000;  // rewrite the expander periodically even without changes
 constexpr uint32_t KEY_HOLD_MS = 1500;  // held keys lapse if the page stops repeating them (tab closed, network gone)
+constexpr uint32_t RANDOM_CHANNEL_MAX_MS = 10000;  // random interval channel at full
 #ifdef ANIMATRONIC
 constexpr uint8_t ANIM_MASK = ANIM_RELAY_MASK;  // relays driven by the animatronic controller
 #else
@@ -44,7 +45,20 @@ bool everDmx, everArt;
 uint8_t relayMask, outMask, writtenMask;  // relayMask: what the inputs ask for; outMask: what's driven
 uint8_t fnMask;                           // animatronic functions the inputs ask for, bit = AnimFn
 uint8_t sfxMask;                          // sound triggers the inputs ask for
-int16_t inputVolume = -1;                 // last volume-channel level, -1 = none
+
+// A channel read as a level rather than switching an output (volume, random mode on/off and
+// interval). It overrides the web setting while an input is live; on signal loss it holds its
+// last level, or hands control back to the web setting when loss = off. A held key reads as
+// full and hands back when released. value = -1: the web setting applies.
+struct LevelInput {
+  int16_t value = -1;
+  bool fromKey = false;
+};
+LevelInput volumeIn, randomIn, randomMsIn, eyesMoveIn, soundMoveIn;
+#ifdef ANIMATRONIC
+bool centerOn;                  // center channel above the threshold; rising = drive back to center
+MotorDir prevDir = MOTOR_STOP;  // to spot a move starting, for sound on move
+#endif
 bool expanderOk;
 uint32_t lastWriteMs, windowStartMs;
 uint16_t dmxFps, artFps;
@@ -53,7 +67,6 @@ RelaySource sources[RELAY_COUNT];
 // loss timeout, which counts as a live input so a released key reads as 0, not "signal lost".
 uint8_t keysNow;
 bool keyLive;
-bool keyVolume;  // the volume level came from a held key
 
 uint8_t packet[600];
 
@@ -144,7 +157,7 @@ void pollInputs(bool udpOpen) {
 
 bool keyHeld(int slot) { return slot && (keysNow >> (slot - 1)) & 1; }
 
-// Value of `slot` (1-8) of the configured range, or -1 if the input isn't live.
+// Value of `slot` (1-16) of the configured range, or -1 if the input isn't live.
 int dmxValue(int slot, bool live) {
   if (!live || !slot) return -1;
   int ch = io.dmxStart + slot - 1;
@@ -164,6 +177,20 @@ bool useDmx(bool dmxLive, bool artLive, int dv, int av) {
     case MERGE_DMX_FIRST: return dmxLive;
     case MERGE_ART_FIRST: return !artLive;
     default: return dv >= av;  // HTP: highest value wins
+  }
+}
+
+[[maybe_unused]] void updateLevel(LevelInput &l, int slot, bool dmxLive, bool artLive) {
+  if (keyHeld(slot)) {
+    l.value = 255;
+    l.fromKey = true;
+  } else if (slot && (dmxLive || artLive)) {
+    const int dv = dmxValue(slot, dmxLive), av = artValue(slot, artLive);
+    l.value = useDmx(dmxLive, artLive, dv, av) ? dv : av;
+    l.fromKey = false;
+  } else if (!slot || io.loss == LOSS_OFF || l.fromKey) {
+    l.value = -1;
+    l.fromKey = false;
   }
 }
 
@@ -220,7 +247,7 @@ void evaluate(uint32_t now, EngineStatus &st) {
     else relayMask &= ~bit;
   }
 
-  for (int s = 1; s <= RELAY_COUNT; s++) {
+  for (int s = 1; s <= INPUT_COUNT; s++) {
     st.inDmx[s - 1] = dmxValue(s, dmxLive);
     st.inArt[s - 1] = artValue(s, artLive);
   }
@@ -263,21 +290,20 @@ void evaluate(uint32_t now, EngineStatus &st) {
       sfxMask |= bit;
     else sfxMask &= ~bit;
   }
-  // The volume channel overrides the web volume while live, and holds or drops on signal loss like a relay.
-  const int vslot = io.sfx.volSlot;
-  if (keyHeld(vslot)) {
-    inputVolume = 255;
-    keyVolume = true;
-  } else if (vslot && (dmxLive || artLive)) {
-    const int dv = dmxValue(vslot, dmxLive), av = artValue(vslot, artLive);
-    inputVolume = useDmx(dmxLive, artLive, dv, av) ? dv : av;
-    keyVolume = false;
-  } else if (!vslot || io.loss == LOSS_OFF || keyVolume) {
-    inputVolume = -1;  // a released key hands the volume back
-    keyVolume = false;
+  updateLevel(volumeIn, io.sfx.volSlot, dmxLive, artLive);
+  updateLevel(randomIn, an.randomSlot, dmxLive, artLive);
+  updateLevel(randomMsIn, an.randomTimeSlot, dmxLive, artLive);
+  updateLevel(eyesMoveIn, an.eyesMoveSlot, dmxLive, artLive);
+  updateLevel(soundMoveIn, an.soundMoveSlot, dmxLive, artLive);
+  {
+    RelaySource src;
+    const bool on = decide(an.centerSlot, centerOn, dmxLive, artLive, dmxValue(an.centerSlot, dmxLive),
+                           artValue(an.centerSlot, artLive), src);
+    if (on && !centerOn && !man) animCenter();  // like pressing Center; the console can't move the head in manual override
+    centerOn = on;
   }
-  const uint8_t volume = inputVolume >= 0 ? (inputVolume * 100 + 127) / 255 : io.sfx.volume;
-  sfxInput(sfxMask, !man, volume, inputVolume >= 0);
+  const uint8_t volume = volumeIn.value >= 0 ? (volumeIn.value * 100 + 127) / 255 : io.sfx.volume;
+  sfxInput(sfxMask, !man, volume, volumeIn.value >= 0);
 #endif
 
   st.dmx = {dmxLive, dmxFps, dmxCount, dmxErrorCount(), dmxSlots};
@@ -315,7 +341,22 @@ void engineTask(void *) {
     evaluate(now, st);
     outMask = relayMask;
 #ifdef ANIMATRONIC
-    outMask = (relayMask & ~ANIM_MASK) | animUpdate(now, io.anim, fnMask, !st.manual, st.anim);
+    AnimSettings an = io.anim;  // with the random mode channels applied
+    if (randomIn.value >= 0) an.random = randomIn.value >= io.threshold;
+    if (randomMsIn.value >= 0) an.randomIntervalMs = (randomMsIn.value * RANDOM_CHANNEL_MAX_MS + 127) / 255;
+    if (eyesMoveIn.value >= 0) an.eyesOnMove = eyesMoveIn.value >= io.threshold;
+    if (soundMoveIn.value >= 0) an.soundOnMove = soundMoveIn.value >= io.threshold;
+    outMask = (relayMask & ~ANIM_MASK) | animUpdate(now, an, fnMask, !st.manual, st.anim);
+    st.anim.randomOn = an.random;
+    st.anim.randomFromInput = randomIn.value >= 0;
+    st.anim.randomMs = an.randomIntervalMs;
+    st.anim.randomMsFromInput = randomMsIn.value >= 0;
+    st.anim.eyesOnMove = an.eyesOnMove;
+    st.anim.eyesOnMoveFromInput = eyesMoveIn.value >= 0;
+    st.anim.soundOnMove = an.soundOnMove;
+    st.anim.soundOnMoveFromInput = soundMoveIn.value >= 0;
+    if (an.soundOnMove && st.anim.dir != MOTOR_STOP && prevDir == MOTOR_STOP) sfxMoveSound();
+    prevDir = st.anim.dir;
     if ((outMask & 0x03) == 0x03) outMask &= ~0x03;  // last-ditch guard: never both motor relays at once
     // Relay tiles 1-3 show the levels of the function driving them.
     const uint8_t fnOf[3] = {uint8_t(io.anim.swap ? FN_RIGHT : FN_LEFT), uint8_t(io.anim.swap ? FN_LEFT : FN_RIGHT), FN_EYES};
